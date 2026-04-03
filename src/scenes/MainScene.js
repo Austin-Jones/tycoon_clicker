@@ -172,6 +172,7 @@ export class MainScene extends Phaser.Scene {
         super('MainScene');
         this.activeTab = TAB_UPGRADES;
         this.panelDragging = false;
+        this.pointerDownInPanel = false;
         this.panelScroll = 0;
         this.panelScrollTarget = 0;
         this.maxPanelScroll = 0;
@@ -471,11 +472,18 @@ export class MainScene extends Phaser.Scene {
         this.input.on('pointerdown', (pointer) => {
             this.dragStartY = pointer.y;
             this.dragStartScroll = this.panelScrollTarget;
-            this.panelDragging = this.activeTab === TAB_UPGRADES && this.isInsideUpgradeViewport(pointer.x, pointer.y);
+            this.pointerDownInPanel = this.activeTab === TAB_UPGRADES && this.isInsideUpgradeViewport(pointer.x, pointer.y);
+            this.panelDragging = false;
         });
 
         this.input.on('pointermove', (pointer) => {
-            if (!pointer.isDown || !this.panelDragging) {
+            if (!pointer.isDown || !this.pointerDownInPanel) {
+                return;
+            }
+            if (!this.panelDragging && Math.abs(pointer.y - this.dragStartY) > 10) {
+                this.panelDragging = true;
+            }
+            if (!this.panelDragging) {
                 return;
             }
             this.panelScrollTarget = clamp(this.dragStartScroll - (pointer.y - this.dragStartY), 0, this.maxPanelScroll);
@@ -483,6 +491,7 @@ export class MainScene extends Phaser.Scene {
 
         this.input.on('pointerup', () => {
             this.panelDragging = false;
+            this.pointerDownInPanel = false;
         });
     }
 
