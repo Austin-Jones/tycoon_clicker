@@ -734,7 +734,7 @@ export class MainScene extends Phaser.Scene {
             processedFormsLifetime: formatNumber(state.processedFormsLifetime),
             arrivalRate: formatNumber(stats.arrivalRate),
             autoProcessRate: formatNumber(stats.autoProcessRate),
-            incomePerSecond: formatNumber(stats.incomePerSecond),
+            incomePerSecond: stats.incomePerSecond > 0 && stats.incomePerSecond < 1 ? '<1' : formatNumber(stats.incomePerSecond),
             bureaucracyLevel: formatNumber(state.bureaucracyLevel),
             queueCapacity: formatNumber(stats.queueCapacity),
         };

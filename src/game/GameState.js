@@ -30,6 +30,9 @@ export class GameState {
                 marketingCampaign: 0,
                 complianceDesk: 0,
                 approvalLayer: 0,
+                expressWindow: 0,
+                seniorClerk: 0,
+                efficiencyOffice: 0,
                 doubleStamp: 0,
                 surgeProtocol: 0,
             },
@@ -127,15 +130,22 @@ export class GameState {
         const betterInk = this.getUpgradeLevel('betterInk');
         const largerInbox = this.getUpgradeLevel('largerInbox');
         const juniorClerk = this.getUpgradeLevel('juniorClerk');
+        const seniorClerk = this.getUpgradeLevel('seniorClerk');
         const marketingCampaign = this.getUpgradeLevel('marketingCampaign');
         const complianceDesk = this.getUpgradeLevel('complianceDesk');
         const approvalLayersBought = this.getUpgradeLevel('approvalLayer');
+        const expressWindow = this.getUpgradeLevel('expressWindow');
+        const efficiencyOffice = this.getUpgradeLevel('efficiencyOffice');
         const doubleStamp = this.getUpgradeLevel('doubleStamp');
         const surgeProtocol = this.getUpgradeLevel('surgeProtocol');
         const approvalMultiplier = 1 + (approvalLayersBought * ECONOMY.approvalLayerBonus);
+        const efficiencyMultiplier = 1 + (efficiencyOffice * 0.15);
         const queueCapacity = ECONOMY.startingCapacity + (largerInbox * 8);
         const queueRatio = queueCapacity > 0 ? this.state.pendingForms / queueCapacity : 0;
         const overflowActive = this.state.pendingForms >= queueCapacity;
+        const autoProcessRate = ((ECONOMY.startingAutoProcessRate + juniorClerk + (seniorClerk * 2)) * approvalMultiplier) * efficiencyMultiplier;
+        const moneyPerForm = ECONOMY.startingMoneyPerForm + betterInk;
+        const moneyMultiplier = ((ECONOMY.startingMoneyMultiplier + (complianceDesk * 0.25)) * approvalMultiplier) * efficiencyMultiplier;
 
         // Approval layers are the main higher-tier growth lever in the MVP.
         // They gently amplify every major rate without needing extra systems.
@@ -144,13 +154,13 @@ export class GameState {
             queueRatio,
             overflowActive,
             arrivalRate: (ECONOMY.startingArrivalRate + (marketingCampaign * 0.75)) * approvalMultiplier,
-            autoProcessRate: (ECONOMY.startingAutoProcessRate + juniorClerk) * approvalMultiplier,
-            moneyPerForm: ECONOMY.startingMoneyPerForm + betterInk,
-            moneyMultiplier: (ECONOMY.startingMoneyMultiplier + (complianceDesk * 0.25)) * approvalMultiplier,
-            incomePerSecond: ((ECONOMY.startingAutoProcessRate + juniorClerk) * approvalMultiplier)
-                * ((ECONOMY.startingMoneyPerForm + betterInk) * ((ECONOMY.startingMoneyMultiplier + (complianceDesk * 0.25)) * approvalMultiplier)),
+            autoProcessRate,
+            moneyPerForm,
+            moneyMultiplier,
+            incomePerSecond: autoProcessRate * (moneyPerForm * moneyMultiplier),
             approvalMultiplier,
-            manualProcessAmount: ECONOMY.manualProcessAmount + doubleStamp,
+            efficiencyMultiplier,
+            manualProcessAmount: ECONOMY.manualProcessAmount + expressWindow + doubleStamp,
             surgeUnlocked: surgeProtocol > 0,
             surgeReady: surgeProtocol > 0 && queueRatio >= ECONOMY.surgeQueueThreshold,
             surgeProcessAmount: surgeProtocol > 0 ? ECONOMY.surgeProcessAmount : 0,
@@ -408,6 +418,7 @@ export class GameState {
         let unlocked = false;
 
         unlocked = this.unlockUpgradeOnce('doubleStamp', this.state.processedFormsLifetime >= 20) || unlocked;
+        unlocked = this.unlockUpgradeOnce('seniorClerk', this.state.processedFormsLifetime >= 75) || unlocked;
         unlocked = this.unlockUpgradeOnce('surgeProtocol', this.state.bureaucracyLevel >= 3) || unlocked;
 
         return unlocked;
@@ -430,8 +441,11 @@ export class GameState {
         const money = this.state.money;
 
         unlocked = this.unlockOnce('forms-10', processed >= 10, 'Ten forms processed. The office now recognizes momentum.') || unlocked;
+        unlocked = this.unlockOnce('forms-50', processed >= 50, 'Fifty forms processed. Throughput now qualifies as a management concern.') || unlocked;
         unlocked = this.unlockOnce('money-100', money >= 100, 'Budget surplus detected. Additional clipboards authorized.') || unlocked;
+        unlocked = this.unlockOnce('money-250', money >= 250, 'Quarterly budget review passed. Procurement has become optimistic.') || unlocked;
         unlocked = this.unlockOnce('bureaucracy-3', this.state.bureaucracyLevel >= 3, pickRandom(STATUS_MESSAGES.unlocked)) || unlocked;
+        unlocked = this.unlockOnce('bureaucracy-4', this.state.bureaucracyLevel >= 4, 'Office Level 4 reached. Departmental momentum has become official.') || unlocked;
         unlocked = this.unlockOnce('auto-5', this.getStats().autoProcessRate >= 5, 'Automation audit passed with minimal enthusiasm.') || unlocked;
         return unlocked;
     }
