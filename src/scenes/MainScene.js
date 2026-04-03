@@ -731,6 +731,7 @@ export class MainScene extends Phaser.Scene {
         if (change.utility) {
             this.refreshUtility();
         }
+        this.refreshStampButtonState();
     }
 
     refreshAllUi() {
@@ -739,6 +740,7 @@ export class MainScene extends Phaser.Scene {
         this.refreshUpgrades();
         this.refreshLog(true);
         this.refreshUtility();
+        this.refreshStampButtonState();
     }
 
     setCachedText(key, target, value) {
@@ -779,7 +781,6 @@ export class MainScene extends Phaser.Scene {
         this.ui.pendingCount.setColor(stats.overflowActive ? '#8a3f39' : '#52606d');
         this.ui.overflowStatus.setVisible(stats.overflowActive);
         this.ui.rushButton.setVisible(rushUnlocked);
-        this.ui.stampButton.setDisabled(state.pendingForms <= 0);
     }
 
     refreshStats() {
@@ -817,10 +818,11 @@ export class MainScene extends Phaser.Scene {
             const level = this.gameState.getUpgradeLevel(entry.upgradeId);
             const cost = this.gameState.getUpgradeCost(entry.upgradeId);
             const maxed = this.gameState.isUpgradeMaxed(entry.upgradeId);
+            const upgradeButton = entry.buyButton;
 
             this.setCachedText(`upgrade-level-${entry.upgradeId}`, entry.level, `${formatTierLabel(entry.tier)} - Lv ${level}`);
             this.setCachedText(`upgrade-cost-${entry.upgradeId}`, entry.cost, maxed ? 'Max' : `$${formatNumber(cost)}`);
-            this.setCachedText(`upgrade-button-${entry.upgradeId}`, entry.buyButton.label, maxed ? 'Max' : 'Buy');
+            this.setCachedText(`upgrade-button-${entry.upgradeId}`, upgradeButton.label, maxed ? 'Max' : 'Buy');
         });
 
         if (visibilityChanged) {
@@ -835,8 +837,10 @@ export class MainScene extends Phaser.Scene {
                 return;
             }
 
+            const upgradeButton = entry.buyButton;
+
             if (this.gameState.isUpgradeMaxed(entry.upgradeId)) {
-                entry.buyButton.setDisabled(true);
+                upgradeButton.setDisabled(true);
                 entry.panel.body.setBlockFill(0xd6ccbb, 1);
                 entry.cost.setColor('#6e675d');
                 return;
@@ -849,10 +853,17 @@ export class MainScene extends Phaser.Scene {
             }
 
             this.valueCache[key] = affordable;
-            entry.buyButton.setDisabled(!affordable);
+            upgradeButton.setDisabled(!affordable);
             entry.panel.body.setBlockFill(affordable ? THEME.colors.cream : 0xd6ccbb, 1);
             entry.cost.setColor(affordable ? '#7a332e' : '#6e675d');
         });
+    }
+
+    refreshStampButtonState() {
+        // STAMP FORM enable/disable is controlled exclusively by the current
+        // inbox count. Upgrade affordability and maxed states must never touch it.
+        const hasInboxForms = this.gameState.state.pendingForms > 0;
+        this.ui.stampButton.setDisabled(!hasInboxForms);
     }
 
     refreshLog(force = false) {

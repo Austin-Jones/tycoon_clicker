@@ -254,7 +254,11 @@ export class GameState {
             changedLog = changedLog || result.changedLog;
         }
 
-        const autoProcessedForms = Math.min(this.state.pendingForms, stats.autoProcessRate * deltaSeconds);
+        // Leave a small manual reserve in the inbox so automation does not pin
+        // pending forms at zero and make stamping feel unavailable forever.
+        const reserve = Math.max(1, stats.manualProcessAmount);
+        const processableByAuto = Math.max(0, this.state.pendingForms - reserve);
+        const autoProcessedForms = Math.min(processableByAuto, stats.autoProcessRate * deltaSeconds);
         if (autoProcessedForms > 0) {
             const result = this.processForms(autoProcessedForms, 'automation', { silent: true });
             changedResources = changedResources || result.changedResources;
