@@ -35,10 +35,15 @@ export class GameState {
                 efficiencyOffice: 0,
                 doubleStamp: 0,
                 surgeProtocol: 0,
+                bulkFiling: 0,
+                overtimeProgram: 0,
+                federalSubsidy: 0,
             },
             statusLog: ['Office opened. Initial backlog remains purely aspirational.'],
             unlockFlags: {},
             overflowActive: false,
+            rushMode: false,
+            currentContract: null,
             lastSavedAt: 0,
         };
     }
@@ -70,13 +75,18 @@ export class GameState {
                     : fresh.statusLog,
             };
             this.surgeCooldown = 0;
+            this.checkTierUnlocks();
             this.checkUpgradeUnlocks();
+            if (!this.state.currentContract) {
+                this.assignNextContract();
+            }
             this.pushMessage('Archived files recovered from local storage.');
             this.emitChange({
                 resources: true,
                 stats: true,
                 queue: true,
                 upgrades: true,
+                contract: true,
                 log: true,
                 utility: true,
             });
@@ -102,12 +112,14 @@ export class GameState {
         this.state = this.createDefaultState();
         this.surgeCooldown = 0;
         localStorage.removeItem(SAVE_KEY);
+        this.assignNextContract();
         this.pushMessage('All records shredded. Fresh paperwork incoming.');
         this.emitChange({
             resources: true,
             stats: true,
             queue: true,
             upgrades: true,
+            contract: true,
             log: true,
             utility: true,
         });
@@ -138,14 +150,21 @@ export class GameState {
         const efficiencyOffice = this.getUpgradeLevel('efficiencyOffice');
         const doubleStamp = this.getUpgradeLevel('doubleStamp');
         const surgeProtocol = this.getUpgradeLevel('surgeProtocol');
+        const bulkFiling = this.getUpgradeLevel('bulkFiling');
+        const overtimeProgram = this.getUpgradeLevel('overtimeProgram');
+        const federalSubsidy = this.getUpgradeLevel('federalSubsidy');
         const approvalMultiplier = 1 + (approvalLayersBought * ECONOMY.approvalLayerBonus);
         const efficiencyMultiplier = 1 + (efficiencyOffice * 0.15);
         const queueCapacity = ECONOMY.startingCapacity + (largerInbox * 8);
         const queueRatio = queueCapacity > 0 ? this.state.pendingForms / queueCapacity : 0;
         const overflowActive = this.state.pendingForms >= queueCapacity;
-        const autoProcessRate = ((ECONOMY.startingAutoProcessRate + juniorClerk + (seniorClerk * 2)) * approvalMultiplier) * efficiencyMultiplier;
+        const rushMultiplier = this.state.rushMode ? 1.4 : 1;
+        const rushPayoutMultiplier = this.state.rushMode ? 1.25 : 1;
+        const overtimeMultiplier = overtimeProgram > 0 ? 2 : 1;
+        const subsidyMultiplier = federalSubsidy > 0 ? 2 : 1;
+        const autoProcessRate = (((ECONOMY.startingAutoProcessRate + juniorClerk + (seniorClerk * 2)) * approvalMultiplier) * efficiencyMultiplier) * overtimeMultiplier;
         const moneyPerForm = ECONOMY.startingMoneyPerForm + betterInk;
-        const moneyMultiplier = ((ECONOMY.startingMoneyMultiplier + (complianceDesk * 0.25)) * approvalMultiplier) * efficiencyMultiplier;
+        const moneyMultiplier = ((((ECONOMY.startingMoneyMultiplier + (complianceDesk * 0.25)) * approvalMultiplier) * efficiencyMultiplier) * rushPayoutMultiplier) * subsidyMultiplier;
 
         // Approval layers are the main higher-tier growth lever in the MVP.
         // They gently amplify every major rate without needing extra systems.
@@ -153,26 +172,65 @@ export class GameState {
             queueCapacity,
             queueRatio,
             overflowActive,
-            arrivalRate: (ECONOMY.startingArrivalRate + (marketingCampaign * 0.75)) * approvalMultiplier,
+            arrivalRate: ((ECONOMY.startingArrivalRate + (marketingCampaign * 0.75)) * approvalMultiplier) * rushMultiplier,
             autoProcessRate,
             moneyPerForm,
             moneyMultiplier,
             incomePerSecond: autoProcessRate * (moneyPerForm * moneyMultiplier),
             approvalMultiplier,
             efficiencyMultiplier,
-            manualProcessAmount: ECONOMY.manualProcessAmount + expressWindow + doubleStamp,
+            rushMode: this.state.rushMode,
+            manualProcessAmount: ECONOMY.manualProcessAmount + expressWindow + doubleStamp + (bulkFiling * 3),
             surgeUnlocked: surgeProtocol > 0,
             surgeReady: surgeProtocol > 0 && queueRatio >= ECONOMY.surgeQueueThreshold,
             surgeProcessAmount: surgeProtocol > 0 ? ECONOMY.surgeProcessAmount : 0,
         };
     }
 
-    isUpgradeUnlocked(id) {
-        const definition = UPGRADE_DEFINITIONS[id];
-        if (!definition || !definition.unlockFlag) {
+    getNextTierMilestone() {
+        if (!this.isTierUnlocked('department')) {
+            return {
+                tier: 'department',
+                label: 'Department',
+                current: this.state.processedFormsLifetime,
+                target: 30,
+                suffix: 'processed',
+            };
+        }
+
+        if (!this.isTierUnlocked('agency')) {
+            return {
+                tier: 'agency',
+                label: 'Agency',
+                current: this.state.money,
+                target: 220,
+                suffix: 'budget',
+            };
+        }
+
+        return null;
+    }
+
+    getCurrentContract() {
+        return this.state.currentContract;
+    }
+
+    isTierUnlocked(tier) {
+        if (!tier || tier === 'office') {
             return true;
         }
-        return !!this.state.unlockFlags[definition.unlockFlag];
+        return !!this.state.unlockFlags[`tier-${tier}`];
+    }
+
+    isUpgradeUnlocked(id) {
+        const definition = UPGRADE_DEFINITIONS[id];
+        if (!definition) {
+            return false;
+        }
+        if (!definition.unlockFlag) {
+            return this.isTierUnlocked(definition.tier);
+        }
+        return this.isTierUnlocked(definition.tier) && !!this.state.unlockFlags[definition.unlockFlag];
     }
 
     isUpgradeMaxed(id) {
@@ -185,6 +243,7 @@ export class GameState {
         let changedResources = false;
         let changedQueue = false;
         let changedUpgrades = false;
+        let changedContract = false;
         let changedLog = false;
 
         const arrivingForms = stats.arrivalRate * deltaSeconds;
@@ -214,17 +273,23 @@ export class GameState {
             }
         }
 
+        changedUpgrades = this.checkTierUnlocks() || changedUpgrades;
         changedUpgrades = this.checkUpgradeUnlocks() || changedUpgrades;
+        const contractResult = this.updateContract(deltaSeconds, stats);
+        changedResources = changedResources || contractResult.changedResources;
+        changedContract = changedContract || contractResult.changedContract;
+        changedLog = changedLog || contractResult.changedLog;
         changedLog = this.checkUnlocks() || changedLog;
 
         // Batch tick-side mutations into a single change notification so
         // automation and form generation don't trigger multiple UI passes.
-        if (changedResources || changedQueue || changedUpgrades || changedLog) {
+        if (changedResources || changedQueue || changedUpgrades || changedContract || changedLog) {
             this.emitChange({
                 resources: changedResources,
                 stats: changedResources || changedQueue,
                 queue: changedQueue,
                 upgrades: changedUpgrades,
+                contract: changedContract,
                 log: changedLog,
             });
         }
@@ -402,6 +467,7 @@ export class GameState {
             this.surgeCooldown = ECONOMY.surgeIntervalSeconds;
         }
 
+        this.checkTierUnlocks();
         this.checkUpgradeUnlocks();
         this.checkUnlocks();
         this.emitChange({
@@ -409,17 +475,181 @@ export class GameState {
             stats: true,
             queue: id === 'largerInbox',
             upgrades: true,
+            contract: true,
             log: true,
         });
         return true;
+    }
+
+    toggleRushMode() {
+        if (!this.isTierUnlocked('department')) {
+            this.pushMessage('Rush directives unlock when the office expands into a department.');
+            this.emitChange({ log: true });
+            return false;
+        }
+
+        this.state.rushMode = !this.state.rushMode;
+        this.pushMessage(this.state.rushMode
+            ? 'Rush Mode enabled. Budget rises faster, but the inbox will strain sooner.'
+            : 'Rush Mode disabled. Operations return to standard delay.');
+        this.emitChange({
+            resources: true,
+            stats: true,
+            contract: true,
+            log: true,
+        });
+        return true;
+    }
+
+    updateContract(deltaSeconds, stats) {
+        const contract = this.state.currentContract;
+        if (!contract) {
+            this.assignNextContract();
+            return { changedResources: false, changedContract: true, changedLog: true };
+        }
+
+        let changedContract = false;
+        let changedResources = false;
+        let changedLog = false;
+
+        if (contract.type === 'steady') {
+            const nextProgress = stats.overflowActive ? 0 : Math.min(contract.target, contract.progress + deltaSeconds);
+            if (Math.floor(nextProgress) !== Math.floor(contract.progress)) {
+                changedContract = true;
+            }
+            contract.progress = nextProgress;
+        }
+
+        const progress = this.getContractProgress(contract, stats);
+        if (progress >= contract.target) {
+            this.state.money += contract.reward;
+            this.pushMessage(`Contract complete. ${contract.rewardLabel} awarded immediately.`);
+            this.assignNextContract();
+            changedResources = true;
+            changedContract = true;
+            changedLog = true;
+        }
+
+        return { changedResources, changedContract, changedLog };
+    }
+
+    assignNextContract() {
+        const stats = this.getStats();
+        const processed = this.state.processedFormsLifetime;
+        const availableTypes = ['process', 'earn'];
+
+        if (processed >= 12) {
+            availableTypes.push('steady');
+        }
+        if (stats.autoProcessRate >= 1) {
+            availableTypes.push('auto');
+        }
+
+        const type = pickRandom(availableTypes);
+        const contract = this.createContract(type, stats);
+        this.state.currentContract = contract;
+        this.pushMessage(`New contract issued: ${contract.shortLabel}.`);
+        return contract;
+    }
+
+    createContract(type, stats) {
+        if (type === 'earn') {
+            const target = Math.max(18, Math.floor(18 + (this.state.processedFormsLifetime * 0.22)));
+            const reward = Math.max(20, Math.floor(target * ECONOMY.contractBudgetRewardMultiplier));
+            return {
+                type,
+                shortLabel: `Earn $${target}`,
+                label: `Earn $${target} budget`,
+                target,
+                reward,
+                rewardLabel: `$${reward} budget`,
+                startValue: this.state.money,
+            };
+        }
+
+        if (type === 'steady') {
+            const target = 12 + (this.state.bureaucracyLevel * 3);
+            const reward = 26 + (this.state.bureaucracyLevel * 8);
+            return {
+                type,
+                shortLabel: `Avoid overflow for ${target}s`,
+                label: `Avoid overflow for ${target}s`,
+                target,
+                reward,
+                rewardLabel: `$${reward} budget`,
+                progress: 0,
+            };
+        }
+
+        if (type === 'auto') {
+            const target = Math.max(2, Math.ceil(stats.autoProcessRate + 2));
+            const reward = 32 + (target * 10);
+            return {
+                type,
+                shortLabel: `Reach ${target} auto / s`,
+                label: `Reach ${target} auto-process / s`,
+                target,
+                reward,
+                rewardLabel: `$${reward} budget`,
+            };
+        }
+
+        const target = Math.max(10, Math.floor(10 + (this.state.processedFormsLifetime * 0.25)));
+        const reward = Math.max(16, Math.floor(target * ECONOMY.contractBudgetRewardMultiplier));
+        return {
+            type: 'process',
+            shortLabel: `Process ${target} forms`,
+            label: `Process ${target} forms`,
+            target,
+            reward,
+            rewardLabel: `$${reward} budget`,
+            startValue: this.state.processedFormsLifetime,
+        };
+    }
+
+    getContractProgress(contract = this.state.currentContract, stats = this.getStats()) {
+        if (!contract) {
+            return 0;
+        }
+
+        if (contract.type === 'earn' || contract.type === 'process') {
+            const sourceValue = contract.type === 'earn' ? this.state.money : this.state.processedFormsLifetime;
+            return Math.max(0, sourceValue - (contract.startValue || 0));
+        }
+
+        if (contract.type === 'auto') {
+            return stats.autoProcessRate;
+        }
+
+        return contract.progress || 0;
+    }
+
+    checkTierUnlocks() {
+        let unlocked = false;
+
+        unlocked = this.unlockOnce(
+            'tier-department',
+            this.state.processedFormsLifetime >= 30,
+            'Department tier unlocked. New policies approved, including Rush Mode.'
+        ) || unlocked;
+        unlocked = this.unlockOnce(
+            'tier-agency',
+            this.state.money >= 220,
+            'Agency tier unlocked. High-level directives and advanced upgrades are now available.'
+        ) || unlocked;
+
+        return unlocked;
     }
 
     checkUpgradeUnlocks() {
         let unlocked = false;
 
         unlocked = this.unlockUpgradeOnce('doubleStamp', this.state.processedFormsLifetime >= 20) || unlocked;
+        unlocked = this.unlockUpgradeOnce('bulkFiling', this.state.processedFormsLifetime >= 45) || unlocked;
         unlocked = this.unlockUpgradeOnce('seniorClerk', this.state.processedFormsLifetime >= 75) || unlocked;
+        unlocked = this.unlockUpgradeOnce('overtimeProgram', this.state.money >= 140) || unlocked;
         unlocked = this.unlockUpgradeOnce('surgeProtocol', this.state.bureaucracyLevel >= 3) || unlocked;
+        unlocked = this.unlockUpgradeOnce('federalSubsidy', this.state.bureaucracyLevel >= 4) || unlocked;
 
         return unlocked;
     }

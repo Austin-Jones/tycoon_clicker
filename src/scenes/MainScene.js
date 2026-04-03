@@ -29,6 +29,14 @@ function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
+function formatTierLabel(tier) {
+    return {
+        office: 'Office',
+        department: 'Department',
+        agency: 'Agency',
+    }[tier] || 'Office';
+}
+
 function createBlock(scene, fill, alpha = 1, radius = LAYOUT.radius) {
     const graphics = scene.add.graphics();
     graphics._width = 0;
@@ -258,6 +266,12 @@ export class MainScene extends Phaser.Scene {
             color: THEME.colors.textMuted,
             wordWrap: { width: 180 },
         });
+        this.ui.headerProgress = createLabel(this, '', {
+            fontFamily: THEME.typography.body,
+            fontSize: '10px',
+            color: THEME.colors.textSubtle,
+            wordWrap: { width: 180 },
+        });
         this.ui.headerBudgetLabel = createLabel(this, 'Budget', {
             fontFamily: THEME.typography.body,
             fontSize: '12px',
@@ -270,7 +284,7 @@ export class MainScene extends Phaser.Scene {
             fontStyle: 'bold',
         });
 
-        this.ui.root.add([this.ui.headerTitle, this.ui.headerHint, this.ui.headerBudgetLabel, this.ui.headerBudgetValue]);
+        this.ui.root.add([this.ui.headerTitle, this.ui.headerHint, this.ui.headerProgress, this.ui.headerBudgetLabel, this.ui.headerBudgetValue]);
     }
 
     createStampSection() {
@@ -297,6 +311,12 @@ export class MainScene extends Phaser.Scene {
             fontSize: '13px',
             color: '#6a5540',
         });
+        this.ui.rushButton = createButton(this, 'Rush Off', {
+            fill: THEME.colors.cardBlue,
+            pressed: THEME.colors.cardBlueDeep,
+            disabled: 0x68727b,
+            text: '#f6f7f8',
+        }, () => this.handleRushToggle());
         this.ui.stampButton = createButton(this, 'STAMP FORM', {
             fill: THEME.colors.stampRed,
             pressed: THEME.colors.stampRedDeep,
@@ -309,6 +329,7 @@ export class MainScene extends Phaser.Scene {
             this.ui.pendingCount,
             this.ui.overflowStatus,
             this.ui.worthPerForm,
+            this.ui.rushButton,
             this.ui.stampButton,
         ]);
     }
@@ -456,6 +477,7 @@ export class MainScene extends Phaser.Scene {
             cost,
             buyButton,
             upgradeId: upgrade.id,
+            tier: upgrade.tier || 'office',
         };
     }
 
@@ -473,6 +495,15 @@ export class MainScene extends Phaser.Scene {
         }, () => this.handleReset());
 
         this.ui.root.add([this.ui.saveStatus, this.ui.resetButton]);
+
+        this.ui.toast = createLabel(this, '', {
+            fontFamily: THEME.typography.body,
+            fontSize: '11px',
+            color: THEME.colors.textPrimary,
+            backgroundColor: '#1a2634',
+            padding: { left: 10, right: 10, top: 6, bottom: 6 },
+        }).setOrigin(0.5, 1).setAlpha(0).setDepth(50);
+        this.ui.root.add(this.ui.toast);
     }
 
     registerInput() {
@@ -531,16 +562,18 @@ export class MainScene extends Phaser.Scene {
 
         this.ui.cards.header.setPosition(LAYOUT.edge, y).resize(contentWidth, LAYOUT.headerHeight);
         this.ui.headerTitle.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 16).setWordWrapWidth(contentWidth - 140);
-        this.ui.headerHint.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 46).setWordWrapWidth(contentWidth - 140);
+        this.ui.headerHint.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 42).setWordWrapWidth(contentWidth - 140);
+        this.ui.headerProgress.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 58).setWordWrapWidth(contentWidth - 140);
         this.ui.headerBudgetLabel.setPosition(LAYOUT.edge + contentWidth - 94, y + 16);
         this.ui.headerBudgetValue.setPosition(LAYOUT.edge + contentWidth - 94, y + 32);
         y += LAYOUT.headerHeight + LAYOUT.gap;
 
         this.ui.cards.stamp.setPosition(LAYOUT.edge, y).resize(contentWidth, LAYOUT.stampHeight);
-        this.ui.stampTitle.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 14);
-        this.ui.stampButton.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 48).resize(contentWidth - (LAYOUT.cardPadding * 2), 66, '22px');
+        this.ui.stampTitle.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 14).setWordWrapWidth(contentWidth - 124);
+        this.ui.rushButton.setPosition(LAYOUT.edge + contentWidth - 92, y + 12).resize(78, 28, '12px');
+        this.ui.stampButton.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 52).resize(contentWidth - (LAYOUT.cardPadding * 2), 66, '22px');
         this.ui.pendingCount.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 124);
-        this.ui.overflowStatus.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 24).setWordWrapWidth(contentWidth - (LAYOUT.cardPadding * 2));
+        this.ui.overflowStatus.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 36).setWordWrapWidth(contentWidth - (LAYOUT.cardPadding * 2));
         this.ui.worthPerForm.setPosition(LAYOUT.edge + contentWidth - 132, y + 124).setWordWrapWidth(118);
         y += LAYOUT.stampHeight + LAYOUT.gap;
 
@@ -612,6 +645,7 @@ export class MainScene extends Phaser.Scene {
         this.ui.cards.utility.setPosition(LAYOUT.edge, y).resize(contentWidth, LAYOUT.utilityHeight);
         this.ui.saveStatus.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 18).setWordWrapWidth(contentWidth - 120);
         this.ui.resetButton.setPosition(LAYOUT.edge + contentWidth - 78, y + 10).resize(64, 32, '13px');
+        this.ui.toast.setPosition(width / 2, y - 10);
 
         this.setActiveTab(this.activeTab, true);
     }
@@ -662,6 +696,10 @@ export class MainScene extends Phaser.Scene {
         this.gameState.buyUpgrade(id);
     }
 
+    handleRushToggle() {
+        this.gameState.toggleRushMode();
+    }
+
     handleReset() {
         this.gameState.reset();
         this.panelScroll = 0;
@@ -673,6 +711,9 @@ export class MainScene extends Phaser.Scene {
         if (change.resources) {
             this.refreshResources();
             this.refreshUpgradeAffordability();
+        }
+        if (change.contract) {
+            this.refreshResources();
         }
         if (change.queue) {
             this.refreshResources();
@@ -713,16 +754,31 @@ export class MainScene extends Phaser.Scene {
     refreshResources() {
         const state = this.gameState.state;
         const stats = this.gameState.getStats();
+        const nextTier = this.gameState.getNextTierMilestone();
+        const contract = this.gameState.getCurrentContract();
+        const contractProgress = contract ? this.gameState.getContractProgress(contract, stats) : 0;
         const overflowText = stats.overflowActive
             ? 'Inbox Full. New forms are being rejected.'
             : '';
+        const rushUnlocked = this.gameState.isTierUnlocked('department');
+        const rushLabel = state.rushMode ? 'Rush On' : 'Rush Off';
+        const contractText = contract
+            ? `Contract: ${contract.label} (${formatNumber(Math.min(contractProgress, contract.target))} / ${formatNumber(contract.target)})`
+            : 'Contract: awaiting assignment';
+        const nextTierText = nextTier
+            ? `Reward ${contract?.rewardLabel || '$0'} • Next: ${nextTier.label} ${formatNumber(nextTier.current)} / ${formatNumber(nextTier.target)} ${nextTier.suffix}`
+            : `Reward ${contract?.rewardLabel || '$0'} • All tiers unlocked`;
 
         this.setCachedText('budget', this.ui.headerBudgetValue, `$${formatNumber(state.money)}`);
+        this.setCachedText('headerHint', this.ui.headerHint, contractText);
+        this.setCachedText('headerProgress', this.ui.headerProgress, nextTierText);
         this.setCachedText('pendingCount', this.ui.pendingCount, `Inbox: ${formatNumber(state.pendingForms)} / ${formatNumber(stats.queueCapacity)}`);
         this.setCachedText('overflowStatus', this.ui.overflowStatus, overflowText);
         this.setCachedText('worthPerForm', this.ui.worthPerForm, `Process ${formatNumber(this.gameState.getStats().manualProcessAmount)} form${this.gameState.getStats().manualProcessAmount === 1 ? '' : 's'} to earn $${formatNumber(this.gameState.getMoneyPerProcessedForm())}`);
+        this.setCachedText('rushButtonLabel', this.ui.rushButton.label, rushLabel);
         this.ui.pendingCount.setColor(stats.overflowActive ? '#8a3f39' : '#52606d');
         this.ui.overflowStatus.setVisible(stats.overflowActive);
+        this.ui.rushButton.setVisible(rushUnlocked);
         this.ui.stampButton.setDisabled(state.pendingForms <= 0);
     }
 
@@ -762,7 +818,7 @@ export class MainScene extends Phaser.Scene {
             const cost = this.gameState.getUpgradeCost(entry.upgradeId);
             const maxed = this.gameState.isUpgradeMaxed(entry.upgradeId);
 
-            this.setCachedText(`upgrade-level-${entry.upgradeId}`, entry.level, `Lv ${level}`);
+            this.setCachedText(`upgrade-level-${entry.upgradeId}`, entry.level, `${formatTierLabel(entry.tier)} - Lv ${level}`);
             this.setCachedText(`upgrade-cost-${entry.upgradeId}`, entry.cost, maxed ? 'Max' : `$${formatNumber(cost)}`);
             this.setCachedText(`upgrade-button-${entry.upgradeId}`, entry.buyButton.label, maxed ? 'Max' : 'Buy');
         });
@@ -808,11 +864,49 @@ export class MainScene extends Phaser.Scene {
             const message = (this.gameState.state.statusLog[index] || '').replace(/^\d+\.\s*/, '');
             this.setCachedText(`log-${index}`, text, message);
         });
+
+        const latestMessage = (this.gameState.state.statusLog[0] || '').replace(/^\d+\.\s*/, '');
+        if (!force && this.shouldToast(latestMessage)) {
+            this.showToast(latestMessage);
+        }
         this.needsLogRefresh = false;
     }
 
     refreshUtility() {
         this.setCachedText('saveStatus', this.ui.saveStatus, formatRelativeTime(this.gameState.state.lastSavedAt));
+    }
+
+    shouldToast(message) {
+        return !!message && [
+            'unlocked',
+            'approved by committee',
+            'Contract complete',
+            'New contract issued',
+            'Rush Mode',
+            'Budget surplus',
+            'Quarterly budget review',
+            'Office Level',
+            'Department tier',
+            'Agency tier',
+            'Automation audit',
+        ].some((keyword) => message.includes(keyword));
+    }
+
+    showToast(message) {
+        if (!message) {
+            return;
+        }
+
+        this.setCachedText('toastMessage', this.ui.toast, message);
+        this.tweens.killTweensOf(this.ui.toast);
+        this.ui.toast.setAlpha(0.95);
+        this.tweens.add({
+            targets: this.ui.toast,
+            alpha: 0,
+            duration: 1400,
+            ease: 'Quad.out',
+            delay: 600,
+        });
     }
 
     update(_time, delta) {
