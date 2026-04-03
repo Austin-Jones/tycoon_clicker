@@ -11,8 +11,7 @@ function pickRandom(list) {
 export class GameState {
     constructor() {
         this.onChange = null;
-        this.arrivalBuffer = 0;
-        this.autoProcessBuffer = 0;
+        this.surgeCooldown = 0;
         this.messageIndex = 0;
         this.state = this.createDefaultState();
     }
@@ -22,6 +21,7 @@ export class GameState {
             money: ECONOMY.startingMoney,
             pendingForms: ECONOMY.startingPendingForms,
             processedFormsLifetime: 0,
+            rejectedFormsLifetime: 0,
             bureaucracyLevel: 1,
             upgrades: {
                 betterInk: 0,
@@ -30,9 +30,12 @@ export class GameState {
                 marketingCampaign: 0,
                 complianceDesk: 0,
                 approvalLayer: 0,
+                doubleStamp: 0,
+                surgeProtocol: 0,
             },
             statusLog: ['Office opened. Initial backlog remains purely aspirational.'],
             unlockFlags: {},
+            overflowActive: false,
             lastSavedAt: 0,
         };
     }
@@ -63,8 +66,8 @@ export class GameState {
                     ? parsed.statusLog.slice(0, ECONOMY.logLimit)
                     : fresh.statusLog,
             };
-            this.arrivalBuffer = 0;
-            this.autoProcessBuffer = 0;
+            this.surgeCooldown = 0;
+            this.checkUpgradeUnlocks();
             this.pushMessage('Archived files recovered from local storage.');
             this.emitChange({
                 resources: true,
@@ -94,8 +97,7 @@ export class GameState {
 
     reset() {
         this.state = this.createDefaultState();
-        this.arrivalBuffer = 0;
-        this.autoProcessBuffer = 0;
+        this.surgeCooldown = 0;
         localStorage.removeItem(SAVE_KEY);
         this.pushMessage('All records shredded. Fresh paperwork incoming.');
         this.emitChange({
@@ -115,6 +117,9 @@ export class GameState {
     getUpgradeCost(id) {
         const definition = UPGRADE_DEFINITIONS[id];
         const level = this.getUpgradeLevel(id);
+        if (definition.maxLevel && level >= definition.maxLevel) {
+            return Infinity;
+        }
         return Math.floor(definition.baseCost * Math.pow(definition.costScale, level));
     }
 
@@ -125,58 +130,91 @@ export class GameState {
         const marketingCampaign = this.getUpgradeLevel('marketingCampaign');
         const complianceDesk = this.getUpgradeLevel('complianceDesk');
         const approvalLayersBought = this.getUpgradeLevel('approvalLayer');
+        const doubleStamp = this.getUpgradeLevel('doubleStamp');
+        const surgeProtocol = this.getUpgradeLevel('surgeProtocol');
         const approvalMultiplier = 1 + (approvalLayersBought * ECONOMY.approvalLayerBonus);
+        const queueCapacity = ECONOMY.startingCapacity + (largerInbox * 8);
+        const queueRatio = queueCapacity > 0 ? this.state.pendingForms / queueCapacity : 0;
+        const overflowActive = this.state.pendingForms >= queueCapacity;
 
         // Approval layers are the main higher-tier growth lever in the MVP.
         // They gently amplify every major rate without needing extra systems.
         return {
-            queueCapacity: ECONOMY.startingCapacity + (largerInbox * 8),
+            queueCapacity,
+            queueRatio,
+            overflowActive,
             arrivalRate: (ECONOMY.startingArrivalRate + (marketingCampaign * 0.75)) * approvalMultiplier,
             autoProcessRate: (ECONOMY.startingAutoProcessRate + juniorClerk) * approvalMultiplier,
             moneyPerForm: ECONOMY.startingMoneyPerForm + betterInk,
             moneyMultiplier: (ECONOMY.startingMoneyMultiplier + (complianceDesk * 0.25)) * approvalMultiplier,
+            incomePerSecond: ((ECONOMY.startingAutoProcessRate + juniorClerk) * approvalMultiplier)
+                * ((ECONOMY.startingMoneyPerForm + betterInk) * ((ECONOMY.startingMoneyMultiplier + (complianceDesk * 0.25)) * approvalMultiplier)),
             approvalMultiplier,
+            manualProcessAmount: ECONOMY.manualProcessAmount + doubleStamp,
+            surgeUnlocked: surgeProtocol > 0,
+            surgeReady: surgeProtocol > 0 && queueRatio >= ECONOMY.surgeQueueThreshold,
+            surgeProcessAmount: surgeProtocol > 0 ? ECONOMY.surgeProcessAmount : 0,
         };
+    }
+
+    isUpgradeUnlocked(id) {
+        const definition = UPGRADE_DEFINITIONS[id];
+        if (!definition || !definition.unlockFlag) {
+            return true;
+        }
+        return !!this.state.unlockFlags[definition.unlockFlag];
+    }
+
+    isUpgradeMaxed(id) {
+        const definition = UPGRADE_DEFINITIONS[id];
+        return !!(definition?.maxLevel && this.getUpgradeLevel(id) >= definition.maxLevel);
     }
 
     tick(deltaSeconds) {
         const stats = this.getStats();
         let changedResources = false;
         let changedQueue = false;
+        let changedUpgrades = false;
         let changedLog = false;
 
-        // Fractional rates build up in buffers so the simulation can stay smooth
-        // while the game still behaves in whole-form steps.
-        this.arrivalBuffer += stats.arrivalRate * deltaSeconds;
-        const formsToAdd = Math.floor(this.arrivalBuffer);
-
-        if (formsToAdd > 0) {
-            this.arrivalBuffer -= formsToAdd;
-            const result = this.addPendingForms(formsToAdd, { silent: true });
+        const arrivingForms = stats.arrivalRate * deltaSeconds;
+        if (arrivingForms > 0) {
+            const result = this.addPendingForms(arrivingForms, { silent: true });
             changedQueue = changedQueue || result.changedQueue;
+            changedResources = changedResources || result.changedResources;
             changedLog = changedLog || result.changedLog;
         }
 
-        this.autoProcessBuffer += stats.autoProcessRate * deltaSeconds;
-        const formsToProcess = Math.floor(this.autoProcessBuffer);
-
-        if (formsToProcess > 0) {
-            this.autoProcessBuffer -= formsToProcess;
-            const result = this.processForms(formsToProcess, 'automation', { silent: true });
+        const autoProcessedForms = Math.min(this.state.pendingForms, stats.autoProcessRate * deltaSeconds);
+        if (autoProcessedForms > 0) {
+            const result = this.processForms(autoProcessedForms, 'automation', { silent: true });
             changedResources = changedResources || result.changedResources;
             changedQueue = changedQueue || result.changedQueue;
             changedLog = changedLog || result.changedLog;
         }
 
+        if (stats.surgeUnlocked) {
+            this.surgeCooldown -= deltaSeconds;
+            if (this.surgeCooldown <= 0 && stats.queueRatio >= ECONOMY.surgeQueueThreshold) {
+                this.surgeCooldown = ECONOMY.surgeIntervalSeconds;
+                const result = this.processForms(stats.surgeProcessAmount, 'surge', { silent: true });
+                changedResources = changedResources || result.changedResources;
+                changedQueue = changedQueue || result.changedQueue;
+                changedLog = changedLog || result.changedLog;
+            }
+        }
+
+        changedUpgrades = this.checkUpgradeUnlocks() || changedUpgrades;
         changedLog = this.checkUnlocks() || changedLog;
 
         // Batch tick-side mutations into a single change notification so
         // automation and form generation don't trigger multiple UI passes.
-        if (changedResources || changedQueue || changedLog) {
+        if (changedResources || changedQueue || changedUpgrades || changedLog) {
             this.emitChange({
                 resources: changedResources,
-                stats: changedResources,
+                stats: changedResources || changedQueue,
                 queue: changedQueue,
+                upgrades: changedUpgrades,
                 log: changedLog,
             });
         }
@@ -187,32 +225,52 @@ export class GameState {
         const previous = this.state.pendingForms;
         const next = clamp(previous + amount, 0, stats.queueCapacity);
         const accepted = next - previous;
+        const rejected = Math.max(0, amount - accepted);
         let changedLog = false;
+        let changedResources = false;
 
         this.state.pendingForms = next;
 
-        if (accepted > 0 && Math.random() < 0.22) {
+        if (accepted >= 1 && Math.random() < 0.22) {
             this.pushMessage(pickRandom(STATUS_MESSAGES.arrival));
             changedLog = true;
         }
 
-        if (!options.silent && (accepted > 0 || changedLog)) {
+        if (rejected > 0) {
+            this.state.rejectedFormsLifetime += rejected;
+            changedResources = true;
+            if (!this.state.overflowActive) {
+                this.state.overflowActive = true;
+                this.pushMessage(`Inbox overflow. ${formatRejected(rejected)} returned to sender.`);
+                changedLog = true;
+            } else if (rejected >= 1 && Math.random() < 0.28) {
+                this.pushMessage(`${formatRejected(rejected)} rejected during backlog overflow.`);
+                changedLog = true;
+            }
+        } else if (this.state.overflowActive && next < stats.queueCapacity) {
+            this.state.overflowActive = false;
+            this.pushMessage('Overflow pressure eased. New paperwork may once again enter the building.');
+            changedLog = true;
+        }
+
+        if (!options.silent && (accepted > 0 || rejected > 0 || changedLog)) {
             this.emitChange({
-                resources: false,
-                stats: false,
-                queue: accepted > 0,
+                resources: changedResources,
+                stats: changedResources,
+                queue: accepted > 0 || rejected > 0,
                 log: changedLog,
             });
         }
 
         return {
-            changedQueue: accepted > 0,
+            changedQueue: accepted > 0 || rejected > 0,
+            changedResources,
             changedLog,
         };
     }
 
     processOneManualForm() {
-        return this.processForms(ECONOMY.manualProcessAmount, 'manual');
+        return this.processForms(this.getStats().manualProcessAmount, 'manual');
     }
 
     getMoneyPerProcessedForm() {
@@ -257,8 +315,13 @@ export class GameState {
             changedLog = true;
         }
 
-        if (source === 'automation' && Math.random() < 0.14) {
+        if (source === 'automation' && processable >= 1 && Math.random() < 0.14) {
             this.pushMessage(pickRandom(STATUS_MESSAGES.automation));
+            changedLog = true;
+        }
+
+        if (source === 'surge') {
+            this.pushMessage('Surge Protocol clears a small emergency stack.');
             changedLog = true;
         }
 
@@ -284,6 +347,22 @@ export class GameState {
     }
 
     buyUpgrade(id) {
+        if (!this.isUpgradeUnlocked(id)) {
+            this.pushMessage('That policy has not been unlocked yet.');
+            this.emitChange({
+                log: true,
+            });
+            return false;
+        }
+
+        if (this.isUpgradeMaxed(id)) {
+            this.pushMessage('That policy is already fully adopted.');
+            this.emitChange({
+                log: true,
+            });
+            return false;
+        }
+
         const cost = this.getUpgradeCost(id);
 
         if (!this.canAfford(cost)) {
@@ -309,6 +388,11 @@ export class GameState {
             this.pushMessage(`${upgrade.title} approved by committee.`);
         }
 
+        if (id === 'surgeProtocol') {
+            this.surgeCooldown = ECONOMY.surgeIntervalSeconds;
+        }
+
+        this.checkUpgradeUnlocks();
         this.checkUnlocks();
         this.emitChange({
             resources: true,
@@ -317,6 +401,26 @@ export class GameState {
             upgrades: true,
             log: true,
         });
+        return true;
+    }
+
+    checkUpgradeUnlocks() {
+        let unlocked = false;
+
+        unlocked = this.unlockUpgradeOnce('doubleStamp', this.state.processedFormsLifetime >= 20) || unlocked;
+        unlocked = this.unlockUpgradeOnce('surgeProtocol', this.state.bureaucracyLevel >= 3) || unlocked;
+
+        return unlocked;
+    }
+
+    unlockUpgradeOnce(id, condition) {
+        const definition = UPGRADE_DEFINITIONS[id];
+        if (!definition?.unlockFlag || !condition || this.state.unlockFlags[definition.unlockFlag]) {
+            return false;
+        }
+
+        this.state.unlockFlags[definition.unlockFlag] = true;
+        this.pushMessage(definition.unlockMessage);
         return true;
     }
 
@@ -353,4 +457,8 @@ export class GameState {
             this.onChange(this.state, change);
         }
     }
+}
+
+function formatRejected(amount) {
+    return `${amount} form${amount === 1 ? '' : 's'}`;
 }

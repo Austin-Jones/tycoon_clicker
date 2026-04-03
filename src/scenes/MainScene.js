@@ -13,7 +13,7 @@ const LAYOUT = {
     radius: 18,
     headerHeight: 88,
     stampHeight: 156,
-    statsHeight: 178,
+    statsHeight: 224,
     tabsHeight: 38,
     utilityHeight: 52,
     statCols: 2,
@@ -252,6 +252,12 @@ export class MainScene extends Phaser.Scene {
             color: THEME.colors.textPrimary,
             fontStyle: 'bold',
         });
+        this.ui.headerHint = createLabel(this, 'New forms arrive in your inbox. Process them to earn budget.', {
+            fontFamily: THEME.typography.body,
+            fontSize: '11px',
+            color: THEME.colors.textMuted,
+            wordWrap: { width: 180 },
+        });
         this.ui.headerBudgetLabel = createLabel(this, 'Budget', {
             fontFamily: THEME.typography.body,
             fontSize: '12px',
@@ -264,7 +270,7 @@ export class MainScene extends Phaser.Scene {
             fontStyle: 'bold',
         });
 
-        this.ui.root.add([this.ui.headerTitle, this.ui.headerBudgetLabel, this.ui.headerBudgetValue]);
+        this.ui.root.add([this.ui.headerTitle, this.ui.headerHint, this.ui.headerBudgetLabel, this.ui.headerBudgetValue]);
     }
 
     createStampSection() {
@@ -274,13 +280,19 @@ export class MainScene extends Phaser.Scene {
             color: THEME.colors.textDark,
             fontStyle: 'bold',
         });
-        this.ui.pendingCount = createLabel(this, '0 pending', {
+        this.ui.pendingCount = createLabel(this, '0 inbox', {
             fontFamily: THEME.typography.body,
             fontSize: '13px',
             color: '#52606d',
             fontStyle: 'bold',
         });
-        this.ui.worthPerForm = createLabel(this, 'Worth $1 per form', {
+        this.ui.overflowStatus = createLabel(this, '', {
+            fontFamily: THEME.typography.body,
+            fontSize: '11px',
+            color: '#8a3f39',
+            fontStyle: 'bold',
+        });
+        this.ui.worthPerForm = createLabel(this, 'Process 1 form to earn $1', {
             fontFamily: THEME.typography.body,
             fontSize: '13px',
             color: '#6a5540',
@@ -295,6 +307,7 @@ export class MainScene extends Phaser.Scene {
         this.ui.root.add([
             this.ui.stampTitle,
             this.ui.pendingCount,
+            this.ui.overflowStatus,
             this.ui.worthPerForm,
             this.ui.stampButton,
         ]);
@@ -310,12 +323,13 @@ export class MainScene extends Phaser.Scene {
         this.ui.root.add(this.ui.statsTitle);
 
         const statDefs = [
-            ['pendingForms', 'Pending'],
-            ['processedFormsLifetime', 'Processed'],
-            ['arrivalRate', 'Forms / s'],
-            ['autoProcessRate', 'Auto / s'],
-            ['bureaucracyLevel', 'Level'],
-            ['queueCapacity', 'Capacity'],
+            ['pendingForms', 'Inbox'],
+            ['processedFormsLifetime', 'Processed Total'],
+            ['arrivalRate', 'New Forms / s'],
+            ['autoProcessRate', 'Auto Process / s'],
+            ['incomePerSecond', 'Income / s'],
+            ['bureaucracyLevel', 'Office Level'],
+            ['queueCapacity', 'Inbox Limit'],
         ];
 
         statDefs.forEach(([key, label]) => {
@@ -517,6 +531,7 @@ export class MainScene extends Phaser.Scene {
 
         this.ui.cards.header.setPosition(LAYOUT.edge, y).resize(contentWidth, LAYOUT.headerHeight);
         this.ui.headerTitle.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 16).setWordWrapWidth(contentWidth - 140);
+        this.ui.headerHint.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 46).setWordWrapWidth(contentWidth - 140);
         this.ui.headerBudgetLabel.setPosition(LAYOUT.edge + contentWidth - 94, y + 16);
         this.ui.headerBudgetValue.setPosition(LAYOUT.edge + contentWidth - 94, y + 32);
         y += LAYOUT.headerHeight + LAYOUT.gap;
@@ -525,6 +540,7 @@ export class MainScene extends Phaser.Scene {
         this.ui.stampTitle.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 14);
         this.ui.stampButton.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 48).resize(contentWidth - (LAYOUT.cardPadding * 2), 66, '22px');
         this.ui.pendingCount.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 124);
+        this.ui.overflowStatus.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 24).setWordWrapWidth(contentWidth - (LAYOUT.cardPadding * 2));
         this.ui.worthPerForm.setPosition(LAYOUT.edge + contentWidth - 132, y + 124).setWordWrapWidth(118);
         y += LAYOUT.stampHeight + LAYOUT.gap;
 
@@ -564,7 +580,9 @@ export class MainScene extends Phaser.Scene {
         this.ui.panelMask.fillStyle(0xffffff, 1);
         this.ui.panelMask.fillRect(viewportX, viewportY, viewportWidth, viewportHeight);
 
-        this.ui.upgradeEntries.forEach((entry, index) => {
+        const visibleEntries = this.ui.upgradeEntries.filter((entry) => entry.container.visible);
+
+        visibleEntries.forEach((entry, index) => {
             const rowY = index * (LAYOUT.upgradeCardHeight + LAYOUT.upgradeGap);
             entry.container.setPosition(viewportX, viewportY + rowY);
             entry.panel.resize(viewportWidth, LAYOUT.upgradeCardHeight);
@@ -577,7 +595,7 @@ export class MainScene extends Phaser.Scene {
 
         this.maxPanelScroll = Math.max(
             0,
-            (this.ui.upgradeEntries.length * (LAYOUT.upgradeCardHeight + LAYOUT.upgradeGap)) - viewportHeight
+            (visibleEntries.length * (LAYOUT.upgradeCardHeight + LAYOUT.upgradeGap)) - viewportHeight
         );
         this.panelScrollTarget = clamp(this.panelScrollTarget, 0, this.maxPanelScroll);
         this.panelScroll = clamp(this.panelScroll, 0, this.maxPanelScroll);
@@ -694,9 +712,17 @@ export class MainScene extends Phaser.Scene {
 
     refreshResources() {
         const state = this.gameState.state;
+        const stats = this.gameState.getStats();
+        const overflowText = stats.overflowActive
+            ? 'Inbox Full. New forms are being rejected.'
+            : '';
+
         this.setCachedText('budget', this.ui.headerBudgetValue, `$${formatNumber(state.money)}`);
-        this.setCachedText('pendingCount', this.ui.pendingCount, `${formatNumber(state.pendingForms)} pending`);
-        this.setCachedText('worthPerForm', this.ui.worthPerForm, `Worth $${formatNumber(this.gameState.getMoneyPerProcessedForm())} per form`);
+        this.setCachedText('pendingCount', this.ui.pendingCount, `Inbox: ${formatNumber(state.pendingForms)} / ${formatNumber(stats.queueCapacity)}`);
+        this.setCachedText('overflowStatus', this.ui.overflowStatus, overflowText);
+        this.setCachedText('worthPerForm', this.ui.worthPerForm, `Process ${formatNumber(this.gameState.getStats().manualProcessAmount)} form${this.gameState.getStats().manualProcessAmount === 1 ? '' : 's'} to earn $${formatNumber(this.gameState.getMoneyPerProcessedForm())}`);
+        this.ui.pendingCount.setColor(stats.overflowActive ? '#8a3f39' : '#52606d');
+        this.ui.overflowStatus.setVisible(stats.overflowActive);
         this.ui.stampButton.setDisabled(state.pendingForms <= 0);
     }
 
@@ -708,6 +734,7 @@ export class MainScene extends Phaser.Scene {
             processedFormsLifetime: formatNumber(state.processedFormsLifetime),
             arrivalRate: formatNumber(stats.arrivalRate),
             autoProcessRate: formatNumber(stats.autoProcessRate),
+            incomePerSecond: formatNumber(stats.incomePerSecond),
             bureaucracyLevel: formatNumber(state.bureaucracyLevel),
             queueCapacity: formatNumber(stats.queueCapacity),
         };
@@ -718,18 +745,47 @@ export class MainScene extends Phaser.Scene {
     }
 
     refreshUpgrades() {
+        let visibilityChanged = false;
+
         this.ui.upgradeEntries.forEach((entry) => {
+            const unlocked = this.gameState.isUpgradeUnlocked(entry.upgradeId);
+            if (entry.container.visible !== unlocked) {
+                entry.container.setVisible(unlocked);
+                visibilityChanged = true;
+            }
+
+            if (!unlocked) {
+                return;
+            }
+
             const level = this.gameState.getUpgradeLevel(entry.upgradeId);
             const cost = this.gameState.getUpgradeCost(entry.upgradeId);
+            const maxed = this.gameState.isUpgradeMaxed(entry.upgradeId);
 
             this.setCachedText(`upgrade-level-${entry.upgradeId}`, entry.level, `Lv ${level}`);
-            this.setCachedText(`upgrade-cost-${entry.upgradeId}`, entry.cost, `$${formatNumber(cost)}`);
+            this.setCachedText(`upgrade-cost-${entry.upgradeId}`, entry.cost, maxed ? 'Max' : `$${formatNumber(cost)}`);
+            this.setCachedText(`upgrade-button-${entry.upgradeId}`, entry.buyButton.label, maxed ? 'Max' : 'Buy');
         });
+
+        if (visibilityChanged) {
+            this.layout();
+        }
         this.refreshUpgradeAffordability();
     }
 
     refreshUpgradeAffordability() {
         this.ui.upgradeEntries.forEach((entry) => {
+            if (!entry.container.visible) {
+                return;
+            }
+
+            if (this.gameState.isUpgradeMaxed(entry.upgradeId)) {
+                entry.buyButton.setDisabled(true);
+                entry.panel.body.setBlockFill(0xd6ccbb, 1);
+                entry.cost.setColor('#6e675d');
+                return;
+            }
+
             const affordable = this.gameState.canAfford(this.gameState.getUpgradeCost(entry.upgradeId));
             const key = `upgrade-affordable-${entry.upgradeId}`;
             if (this.valueCache[key] === affordable) {
