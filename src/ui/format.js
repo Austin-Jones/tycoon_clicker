@@ -3,18 +3,11 @@ export function formatNumber(value) {
         return '0';
     }
 
-    const absolute = Math.abs(value);
+    const floored = Math.floor(value);
+    const absolute = Math.abs(floored);
 
     if (absolute < 1000) {
-        if (absolute >= 100) {
-            return value.toFixed(0);
-        }
-
-        if (absolute >= 10) {
-            return value.toFixed(1);
-        }
-
-        return value.toFixed(2);
+        return `${floored}`;
     }
 
     const suffixes = ['K', 'M', 'B', 'T', 'Qa', 'Qi'];
@@ -26,9 +19,9 @@ export function formatNumber(value) {
         suffixIndex += 1;
     }
 
-    const decimals = scaled >= 100 ? 0 : scaled >= 10 ? 1 : 2;
-    const signed = value < 0 ? -scaled : scaled;
-    return `${signed.toFixed(decimals)}${suffixes[suffixIndex]}`;
+    const truncatedScaled = Math.floor(scaled);
+    const signed = floored < 0 ? -truncatedScaled : truncatedScaled;
+    return `${signed}${suffixes[suffixIndex]}`;
 }
 
 export function formatRelativeTime(timestamp) {
