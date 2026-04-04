@@ -31,10 +31,10 @@ function clamp(value, min, max) {
 
 function formatTierLabel(tier) {
     return {
-        office: 'Office',
-        department: 'Department',
-        agency: 'Agency',
-    }[tier] || 'Office';
+        office: 'Street',
+        department: 'Syndicate',
+        agency: 'Network',
+    }[tier] || 'Street';
 }
 
 function createBlock(scene, fill, alpha = 1, radius = LAYOUT.radius) {
@@ -264,13 +264,13 @@ export class MainScene extends Phaser.Scene {
     }
 
     createHeaderSection() {
-        this.ui.headerTitle = createLabel(this, 'Startup Tycoon', {
+        this.ui.headerTitle = createLabel(this, 'Black Market Tycoon', {
             fontFamily: THEME.typography.title,
             fontSize: '22px',
             color: THEME.colors.textPrimary,
             fontStyle: 'bold',
         });
-        this.ui.headerHint = createLabel(this, 'Milestone: Ship features and grow the startup.', {
+        this.ui.headerHint = createLabel(this, 'Contract: Move orders, build cash, expand the network.', {
             fontFamily: THEME.typography.body,
             fontSize: '11px',
             color: THEME.colors.textMuted,
@@ -282,7 +282,7 @@ export class MainScene extends Phaser.Scene {
             color: THEME.colors.textSubtle,
             wordWrap: { width: 180 },
         });
-        this.ui.headerBudgetLabel = createLabel(this, 'Revenue', {
+        this.ui.headerBudgetLabel = createLabel(this, 'Cash', {
             fontFamily: THEME.typography.body,
             fontSize: '12px',
             color: THEME.colors.textSubtle,
@@ -294,7 +294,7 @@ export class MainScene extends Phaser.Scene {
             fontStyle: 'bold',
         });
         this.ui.headerStagePreview = this.createCompanyStagePreview();
-        this.ui.headerStageLabel = createLabel(this, 'Bedroom', {
+        this.ui.headerStageLabel = createLabel(this, 'Backroom', {
             fontFamily: THEME.typography.body,
             fontSize: '10px',
             color: THEME.colors.textSubtle,
@@ -313,13 +313,13 @@ export class MainScene extends Phaser.Scene {
     }
 
     createStampSection() {
-        this.ui.stampTitle = createLabel(this, 'Ship Features', {
+        this.ui.stampTitle = createLabel(this, 'Fulfill Orders', {
             fontFamily: THEME.typography.title,
             fontSize: '18px',
             color: THEME.colors.textDark,
             fontStyle: 'bold',
         });
-        this.ui.pendingCount = createLabel(this, 'Backlog: 0 / 0', {
+        this.ui.pendingCount = createLabel(this, 'Orders: 0 / 0', {
             fontFamily: THEME.typography.body,
             fontSize: '13px',
             color: '#52606d',
@@ -331,18 +331,18 @@ export class MainScene extends Phaser.Scene {
             color: '#8a3f39',
             fontStyle: 'bold',
         });
-        this.ui.worthPerForm = createLabel(this, 'Ship 1 feature for $1', {
+        this.ui.worthPerForm = createLabel(this, 'Fulfill 1 order for $1', {
             fontFamily: THEME.typography.body,
             fontSize: '13px',
             color: '#6a5540',
         });
-        this.ui.rushButton = createButton(this, 'Crunch Off', {
+        this.ui.rushButton = createButton(this, 'Risk Off', {
             fill: THEME.colors.cardBlue,
             pressed: THEME.colors.cardBlueDeep,
             disabled: 0x68727b,
             text: '#f6f7f8',
         }, () => this.handleRushToggle());
-        this.ui.stampButton = createButton(this, 'SHIP FEATURES', {
+        this.ui.stampButton = createButton(this, 'FULFILL ORDERS', {
             fill: THEME.colors.stampRed,
             pressed: THEME.colors.stampRedDeep,
             disabled: 0x756864,
@@ -360,7 +360,7 @@ export class MainScene extends Phaser.Scene {
     }
 
     createStatsSection() {
-        this.ui.statsTitle = createLabel(this, 'Company Snapshot', {
+        this.ui.statsTitle = createLabel(this, 'Network Snapshot', {
             fontFamily: THEME.typography.title,
             fontSize: '18px',
             color: THEME.colors.textPrimary,
@@ -369,13 +369,13 @@ export class MainScene extends Phaser.Scene {
         this.ui.root.add(this.ui.statsTitle);
 
         const statDefs = [
-            ['pendingForms', 'Backlog'],
-            ['processedFormsLifetime', 'Features Shipped'],
-            ['arrivalRate', 'New Tasks / s'],
-            ['autoProcessRate', 'Team Output / s'],
-            ['incomePerSecond', 'Revenue / s'],
-            ['bureaucracyLevel', 'Office Level'],
-            ['queueCapacity', 'Backlog Capacity'],
+            ['pendingForms', 'Orders'],
+            ['processedFormsLifetime', 'Orders Completed'],
+            ['arrivalRate', 'Incoming Orders / s'],
+            ['autoProcessRate', 'Operations / s'],
+            ['incomePerSecond', 'Cash / s'],
+            ['bureaucracyLevel', 'Network Tier'],
+            ['queueCapacity', 'Storage Capacity'],
         ];
 
         statDefs.forEach(([key, label]) => {
@@ -399,7 +399,7 @@ export class MainScene extends Phaser.Scene {
     }
 
     createBottomSection() {
-        this.ui.bottomTitle = createLabel(this, 'Growth Hub', {
+        this.ui.bottomTitle = createLabel(this, 'Operations', {
             fontFamily: THEME.typography.title,
             fontSize: '17px',
             color: THEME.colors.textPrimary,
@@ -413,7 +413,7 @@ export class MainScene extends Phaser.Scene {
             text: '#eefaf7',
         }, () => this.setActiveTab(TAB_UPGRADES));
 
-        this.ui.tabs.log = createButton(this, 'Feed', {
+        this.ui.tabs.log = createButton(this, 'Intel', {
             fill: THEME.colors.cardNavy,
             pressed: 0x182534,
             disabled: THEME.colors.cardNavy,
@@ -538,63 +538,49 @@ export class MainScene extends Phaser.Scene {
 
         const stages = [
             createStageGroup(this, [
-                [8, 7, 16, 3, 0xa88d67],
-                [13, 4, 6, 3, 0x8ac2d0],
-                [26, 3, 2, 8, 0xd5b46c],
-                [33, 5, 6, 6, 0x4b6c56],
+                [7, 7, 16, 3, 0x7d5c44],
+                [28, 6, 10, 5, 0x5b4636],
+                [40, 4, 9, 7, 0x5b4636],
             ]),
             createStageGroup(this, [
-                [6, 7, 14, 3, 0xa88d67],
-                [10, 4, 5, 3, 0x8ac2d0],
-                [26, 7, 14, 3, 0xa88d67],
-                [30, 4, 5, 3, 0x8ac2d0],
-                [44, 5, 6, 6, 0x6d7586],
-                [54, 4, 8, 7, 0x4b6c56],
+                [6, 7, 15, 3, 0x7d5c44],
+                [27, 6, 10, 5, 0x5b4636],
+                [40, 5, 10, 6, 0x5b4636],
+                [53, 4, 10, 7, 0x5b4636],
             ]),
             createStageGroup(this, [
-                [6, 7, 14, 3, 0xa88d67],
-                [10, 4, 5, 3, 0x8ac2d0],
-                [26, 7, 14, 3, 0xa88d67],
-                [30, 4, 5, 3, 0x8ac2d0],
-                [48, 2, 12, 8, 0xe5e2d2],
-                [64, 5, 8, 6, 0x4b6c56],
+                [4, 6, 10, 5, 0x5b4636],
+                [16, 4, 10, 7, 0x5b4636],
+                [30, 6, 12, 5, 0x5b4636],
+                [44, 4, 12, 7, 0x5b4636],
+                [61, 3, 15, 8, 0x7d5c44],
             ]),
             createStageGroup(this, [
-                [4, 7, 12, 3, 0xa88d67],
-                [8, 4, 4, 3, 0x8ac2d0],
-                [20, 7, 12, 3, 0xa88d67],
-                [24, 4, 4, 3, 0x8ac2d0],
-                [36, 7, 12, 3, 0xa88d67],
-                [40, 4, 4, 3, 0x8ac2d0],
-                [54, 6, 14, 4, 0xcbb08b],
-                [70, 4, 8, 7, 0x4b6c56],
+                [4, 6, 10, 5, 0x5b4636],
+                [17, 6, 10, 5, 0x5b4636],
+                [30, 6, 10, 5, 0x5b4636],
+                [43, 6, 10, 5, 0x5b4636],
+                [56, 5, 12, 6, 0x7d5c44],
+                [70, 3, 10, 8, 0x2f4e5a],
             ]),
             createStageGroup(this, [
-                [4, 7, 10, 3, 0xa88d67],
-                [7, 4, 4, 3, 0x8ac2d0],
-                [17, 7, 10, 3, 0xa88d67],
-                [20, 4, 4, 3, 0x8ac2d0],
-                [30, 7, 10, 3, 0xa88d67],
-                [33, 4, 4, 3, 0x8ac2d0],
-                [43, 7, 10, 3, 0xa88d67],
-                [46, 4, 4, 3, 0x8ac2d0],
-                [57, 3, 10, 8, 0x2c4661],
-                [70, 5, 10, 6, 0x4b6c56],
+                [3, 6, 9, 5, 0x5b4636],
+                [14, 4, 9, 7, 0x5b4636],
+                [25, 6, 9, 5, 0x5b4636],
+                [36, 4, 9, 7, 0x5b4636],
+                [47, 6, 9, 5, 0x5b4636],
+                [58, 4, 9, 7, 0x5b4636],
+                [69, 3, 12, 8, 0x2f4e5a],
             ]),
             createStageGroup(this, [
-                [3, 7, 8, 3, 0xa88d67],
-                [5, 4, 3, 3, 0x8ac2d0],
-                [14, 7, 8, 3, 0xa88d67],
-                [16, 4, 3, 3, 0x8ac2d0],
-                [25, 7, 8, 3, 0xa88d67],
-                [27, 4, 3, 3, 0x8ac2d0],
-                [36, 7, 8, 3, 0xa88d67],
-                [38, 4, 3, 3, 0x8ac2d0],
-                [47, 7, 8, 3, 0xa88d67],
-                [49, 4, 3, 3, 0x8ac2d0],
-                [58, 7, 8, 3, 0xa88d67],
-                [60, 4, 3, 3, 0x8ac2d0],
-                [69, 3, 13, 8, 0xd3b377],
+                [3, 6, 8, 5, 0x5b4636],
+                [13, 4, 8, 7, 0x5b4636],
+                [23, 6, 8, 5, 0x5b4636],
+                [33, 4, 8, 7, 0x5b4636],
+                [43, 6, 8, 5, 0x5b4636],
+                [53, 4, 8, 7, 0x5b4636],
+                [63, 6, 8, 5, 0x5b4636],
+                [73, 3, 10, 8, 0xc09f62],
             ]),
         ];
 
@@ -878,13 +864,13 @@ export class MainScene extends Phaser.Scene {
         const contractProgress = contract ? this.gameState.getContractProgress(contract, stats) : 0;
         const stageInfo = this.gameState.getCompanyStageInfo();
         const overflowText = stats.overflowActive
-            ? 'Backlog Full. New tasks are being dropped.'
+            ? 'Storage Full. New orders are being turned away.'
             : '';
         const rushUnlocked = this.gameState.isTierUnlocked('department');
-        const rushLabel = state.rushMode ? 'Crunch On' : 'Crunch Off';
+        const rushLabel = state.rushMode ? 'Risk On' : 'Risk Off';
         const contractText = contract
-            ? `Milestone: ${contract.shortLabel} (${formatNumber(Math.min(contractProgress, contract.target))} / ${formatNumber(contract.target)})`
-            : 'Milestone: loading next target';
+            ? `Contract: ${contract.shortLabel} (${formatNumber(Math.min(contractProgress, contract.target))} / ${formatNumber(contract.target)})`
+            : 'Contract: loading next deal';
         const nextTierText = nextTier
             ? `Reward ${contract?.rewardLabel || '$0'} • Next: ${nextTier.label} ${formatNumber(nextTier.current)} / ${formatNumber(nextTier.target)} ${nextTier.suffix}`
             : `Reward ${contract?.rewardLabel || '$0'} • All tiers unlocked`;
@@ -896,12 +882,12 @@ export class MainScene extends Phaser.Scene {
             : `Reward ${contract?.rewardLabel || '$0'} - All tiers unlocked`;
 
         this.setCachedText('headerProgress', this.ui.headerProgress, displayTierText);
-        this.setCachedText('pendingCount', this.ui.pendingCount, `Backlog: ${formatNumber(state.pendingForms)} / ${formatNumber(stats.queueCapacity)}`);
+        this.setCachedText('pendingCount', this.ui.pendingCount, `Orders: ${formatNumber(state.pendingForms)} / ${formatNumber(stats.queueCapacity)}`);
         this.setCachedText('overflowStatus', this.ui.overflowStatus, overflowText);
         this.setCachedText(
             'worthPerForm',
             this.ui.worthPerForm,
-            `Ship ${formatNumber(stats.manualProcessAmount)} feature${stats.manualProcessAmount === 1 ? '' : 's'} for $${formatNumber(this.gameState.getMoneyPerProcessedForm())}`
+            `Fulfill ${formatNumber(stats.manualProcessAmount)} order${stats.manualProcessAmount === 1 ? '' : 's'} for $${formatNumber(this.gameState.getMoneyPerProcessedForm())}`
         );
         this.setCachedText('rushButtonLabel', this.ui.rushButton.label, rushLabel);
         this.setCachedText('headerStageLabel', this.ui.headerStageLabel, stageInfo.label);
@@ -988,8 +974,8 @@ export class MainScene extends Phaser.Scene {
     }
 
     refreshStampButtonState() {
-        // SHIP FEATURES enable/disable is controlled exclusively by the current
-        // backlog count. Upgrade affordability and maxed states must never touch it.
+        // FULFILL ORDERS enable/disable is controlled exclusively by the current
+        // order count. Upgrade affordability and maxed states must never touch it.
         const hasInboxForms = this.gameState.state.pendingForms > 0;
         this.ui.stampButton.setDisabled(!hasInboxForms);
     }
@@ -1023,15 +1009,15 @@ export class MainScene extends Phaser.Scene {
         const lower = message.toLowerCase();
         return [
             'unlocked',
-            'milestone complete',
-            'new milestone',
-            'crunch mode',
-            'revenue passed',
-            'office level',
-            'department tier',
-            'agency tier',
+            'deal complete',
+            'new contract',
+            'high-risk mode',
+            'cash passed',
+            'network tier',
+            'syndicate tier',
             'company stage',
-            'team output',
+            'stage:',
+            'operations passed',
         ].some((keyword) => lower.includes(keyword));
     }
 
