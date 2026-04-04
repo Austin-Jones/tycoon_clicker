@@ -242,6 +242,10 @@ export class GameState {
         return this.state.currentContract;
     }
 
+    getActiveContracts() {
+        return this.state.currentContract ? [this.state.currentContract] : [];
+    }
+
     isTierUnlocked(tier) {
         if (!tier || tier === 'office') {
             return true;

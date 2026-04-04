@@ -243,7 +243,7 @@ export class MainScene extends Phaser.Scene {
             tabs: {},
             statTiles: [],
             upgradeEntries: [],
-            logRows: [],
+            missionCards: [],
         };
 
         this.createCards();
@@ -413,7 +413,7 @@ export class MainScene extends Phaser.Scene {
             text: '#eefaf7',
         }, () => this.setActiveTab(TAB_UPGRADES));
 
-        this.ui.tabs.log = createButton(this, 'Intel', {
+        this.ui.tabs.log = createButton(this, 'Missions', {
             fill: THEME.colors.cardNavy,
             pressed: 0x182534,
             disabled: THEME.colors.cardNavy,
@@ -435,16 +435,28 @@ export class MainScene extends Phaser.Scene {
             this.ui.panelViewport.add(entry.container);
         });
 
-        for (let index = 0; index < ECONOMY.logLimit; index += 1) {
+        for (let index = 0; index < 2; index += 1) {
             const rowPanel = createPanel(this, THEME.colors.cardNavy, 0x061019);
-            const rowText = createLabel(this, '', {
+            const titleText = createLabel(this, '', {
                 fontFamily: THEME.typography.body,
                 fontSize: '12px',
                 color: THEME.colors.textPrimary,
+                fontStyle: 'bold',
                 wordWrap: { width: 260 },
             });
-            this.ui.logRows.push({ panel: rowPanel, text: rowText });
-            this.ui.logPanel.add([rowPanel, rowText]);
+            const progressText = createLabel(this, '', {
+                fontFamily: THEME.typography.body,
+                fontSize: '11px',
+                color: THEME.colors.textSubtle,
+            });
+            const rewardText = createLabel(this, '', {
+                fontFamily: THEME.typography.body,
+                fontSize: '11px',
+                color: THEME.colors.textSubtle,
+                fontStyle: 'bold',
+            });
+            this.ui.missionCards.push({ panel: rowPanel, title: titleText, progress: progressText, reward: rewardText });
+            this.ui.logPanel.add([rowPanel, titleText, progressText, rewardText]);
         }
 
         this.ui.root.add([
@@ -737,10 +749,12 @@ export class MainScene extends Phaser.Scene {
         this.panelScroll = clamp(this.panelScroll, 0, this.maxPanelScroll);
         this.ui.panelViewport.setY(-Math.round(this.panelScroll));
 
-        this.ui.logRows.forEach(({ panel, text }, index) => {
+        this.ui.missionCards.forEach(({ panel, title, progress, reward }, index) => {
             const rowY = viewportY + (index * (LAYOUT.logRowHeight + 8));
             panel.setPosition(viewportX, rowY).resize(viewportWidth, LAYOUT.logRowHeight);
-            text.setPosition(viewportX + 10, rowY + 9).setWordWrapWidth(viewportWidth - 20);
+            title.setPosition(viewportX + 10, rowY + 7).setWordWrapWidth(viewportWidth - 20);
+            progress.setPosition(viewportX + 10, rowY + 25);
+            reward.setPosition(viewportX + viewportWidth - 88, rowY + 25).setWordWrapWidth(78);
         });
 
         y += bottomHeight + LAYOUT.gap;
@@ -814,9 +828,11 @@ export class MainScene extends Phaser.Scene {
         if (change.resources) {
             this.refreshResources();
             this.refreshUpgradeAffordability();
+            this.refreshMissions();
         }
         if (change.contract) {
             this.refreshResources();
+            this.refreshMissions();
         }
         if (change.queue) {
             this.refreshResources();
@@ -824,12 +840,13 @@ export class MainScene extends Phaser.Scene {
         }
         if (change.stats) {
             this.refreshStats();
+            this.refreshMissions();
         }
         if (change.upgrades) {
             this.refreshUpgrades();
         }
         if (change.log) {
-            this.refreshLog();
+            this.refreshNotifications();
         }
         if (change.utility) {
             this.refreshUtility();
@@ -841,7 +858,8 @@ export class MainScene extends Phaser.Scene {
         this.refreshResources();
         this.refreshStats();
         this.refreshUpgrades();
-        this.refreshLog(true);
+        this.refreshMissions();
+        this.refreshNotifications(true);
         this.refreshUtility();
         this.refreshStampButtonState();
     }
@@ -980,15 +998,36 @@ export class MainScene extends Phaser.Scene {
         this.ui.stampButton.setDisabled(!hasInboxForms);
     }
 
-    refreshLog(force = false) {
+    refreshMissions() {
+        const activeContracts = this.gameState.getActiveContracts().slice(0, 2);
+
+        this.ui.missionCards.forEach((card, index) => {
+            const contract = activeContracts[index];
+            card.panel.setVisible(!!contract);
+            card.title.setVisible(!!contract);
+            card.progress.setVisible(!!contract);
+            card.reward.setVisible(!!contract);
+
+            if (!contract) {
+                return;
+            }
+
+            const stats = this.gameState.getStats();
+            const progress = this.gameState.getContractProgress(contract, stats);
+            this.setCachedText(`mission-title-${index}`, card.title, contract.label);
+            this.setCachedText(
+                `mission-progress-${index}`,
+                card.progress,
+                `${formatNumber(Math.min(progress, contract.target))} / ${formatNumber(contract.target)}`
+            );
+            this.setCachedText(`mission-reward-${index}`, card.reward, `Reward ${contract.rewardLabel}`);
+        });
+    }
+
+    refreshNotifications(force = false) {
         if (!force && !this.needsLogRefresh) {
             return;
         }
-
-        this.ui.logRows.forEach(({ text }, index) => {
-            const message = (this.gameState.state.statusLog[index] || '').replace(/^\d+\.\s*/, '');
-            this.setCachedText(`log-${index}`, text, message);
-        });
 
         const latestMessage = (this.gameState.state.statusLog[0] || '').replace(/^\d+\.\s*/, '');
         if (!force && this.shouldToast(latestMessage)) {
@@ -1028,13 +1067,21 @@ export class MainScene extends Phaser.Scene {
 
         this.setCachedText('toastMessage', this.ui.toast, message);
         this.tweens.killTweensOf(this.ui.toast);
-        this.ui.toast.setAlpha(0.95);
+        this.ui.toast.setAlpha(0);
         this.tweens.add({
             targets: this.ui.toast,
-            alpha: 0,
-            duration: 1400,
+            alpha: 0.95,
+            duration: 180,
             ease: 'Quad.out',
-            delay: 600,
+            onComplete: () => {
+                this.tweens.add({
+                    targets: this.ui.toast,
+                    alpha: 0,
+                    duration: 500,
+                    ease: 'Quad.out',
+                    delay: 1900,
+                });
+            },
         });
     }
 
