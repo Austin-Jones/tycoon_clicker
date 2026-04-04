@@ -175,6 +175,16 @@ function createButton(scene, label, palette, onClick, options = {}) {
     return container;
 }
 
+function makeStageRect(scene, x, y, width, height, fill, alpha = 1) {
+    return scene.add.rectangle(x, y, width, height, fill, alpha).setOrigin(0);
+}
+
+function createStageGroup(scene, parts) {
+    const container = scene.add.container(0, 0);
+    container.add(parts.map((part) => makeStageRect(scene, part[0], part[1], part[2], part[3], part[4], part[5] ?? 1)));
+    return container;
+}
+
 export class MainScene extends Phaser.Scene {
     constructor() {
         super('MainScene');
@@ -254,13 +264,13 @@ export class MainScene extends Phaser.Scene {
     }
 
     createHeaderSection() {
-        this.ui.headerTitle = createLabel(this, 'Bureaucracy Tycoon', {
+        this.ui.headerTitle = createLabel(this, 'Startup Tycoon', {
             fontFamily: THEME.typography.title,
             fontSize: '22px',
             color: THEME.colors.textPrimary,
             fontStyle: 'bold',
         });
-        this.ui.headerHint = createLabel(this, 'New forms arrive in your inbox. Process them to earn budget.', {
+        this.ui.headerHint = createLabel(this, 'Milestone: Ship features and grow the startup.', {
             fontFamily: THEME.typography.body,
             fontSize: '11px',
             color: THEME.colors.textMuted,
@@ -272,7 +282,7 @@ export class MainScene extends Phaser.Scene {
             color: THEME.colors.textSubtle,
             wordWrap: { width: 180 },
         });
-        this.ui.headerBudgetLabel = createLabel(this, 'Budget', {
+        this.ui.headerBudgetLabel = createLabel(this, 'Revenue', {
             fontFamily: THEME.typography.body,
             fontSize: '12px',
             color: THEME.colors.textSubtle,
@@ -283,18 +293,33 @@ export class MainScene extends Phaser.Scene {
             color: '#ffe7b0',
             fontStyle: 'bold',
         });
+        this.ui.headerStagePreview = this.createCompanyStagePreview();
+        this.ui.headerStageLabel = createLabel(this, 'Bedroom', {
+            fontFamily: THEME.typography.body,
+            fontSize: '10px',
+            color: THEME.colors.textSubtle,
+            fontStyle: 'bold',
+        }).setOrigin(0.5, 0);
 
-        this.ui.root.add([this.ui.headerTitle, this.ui.headerHint, this.ui.headerProgress, this.ui.headerBudgetLabel, this.ui.headerBudgetValue]);
+        this.ui.root.add([
+            this.ui.headerTitle,
+            this.ui.headerHint,
+            this.ui.headerProgress,
+            this.ui.headerBudgetLabel,
+            this.ui.headerBudgetValue,
+            this.ui.headerStagePreview.container,
+            this.ui.headerStageLabel,
+        ]);
     }
 
     createStampSection() {
-        this.ui.stampTitle = createLabel(this, 'Manual Processing', {
+        this.ui.stampTitle = createLabel(this, 'Ship Features', {
             fontFamily: THEME.typography.title,
             fontSize: '18px',
             color: THEME.colors.textDark,
             fontStyle: 'bold',
         });
-        this.ui.pendingCount = createLabel(this, '0 inbox', {
+        this.ui.pendingCount = createLabel(this, 'Backlog: 0 / 0', {
             fontFamily: THEME.typography.body,
             fontSize: '13px',
             color: '#52606d',
@@ -306,18 +331,18 @@ export class MainScene extends Phaser.Scene {
             color: '#8a3f39',
             fontStyle: 'bold',
         });
-        this.ui.worthPerForm = createLabel(this, 'Process 1 form to earn $1', {
+        this.ui.worthPerForm = createLabel(this, 'Ship 1 feature for $1', {
             fontFamily: THEME.typography.body,
             fontSize: '13px',
             color: '#6a5540',
         });
-        this.ui.rushButton = createButton(this, 'Rush Off', {
+        this.ui.rushButton = createButton(this, 'Crunch Off', {
             fill: THEME.colors.cardBlue,
             pressed: THEME.colors.cardBlueDeep,
             disabled: 0x68727b,
             text: '#f6f7f8',
         }, () => this.handleRushToggle());
-        this.ui.stampButton = createButton(this, 'STAMP FORM', {
+        this.ui.stampButton = createButton(this, 'SHIP FEATURES', {
             fill: THEME.colors.stampRed,
             pressed: THEME.colors.stampRedDeep,
             disabled: 0x756864,
@@ -335,7 +360,7 @@ export class MainScene extends Phaser.Scene {
     }
 
     createStatsSection() {
-        this.ui.statsTitle = createLabel(this, 'Snapshot', {
+        this.ui.statsTitle = createLabel(this, 'Company Snapshot', {
             fontFamily: THEME.typography.title,
             fontSize: '18px',
             color: THEME.colors.textPrimary,
@@ -344,13 +369,13 @@ export class MainScene extends Phaser.Scene {
         this.ui.root.add(this.ui.statsTitle);
 
         const statDefs = [
-            ['pendingForms', 'Inbox'],
-            ['processedFormsLifetime', 'Processed Total'],
-            ['arrivalRate', 'New Forms / s'],
-            ['autoProcessRate', 'Auto Process / s'],
-            ['incomePerSecond', 'Income / s'],
+            ['pendingForms', 'Backlog'],
+            ['processedFormsLifetime', 'Features Shipped'],
+            ['arrivalRate', 'New Tasks / s'],
+            ['autoProcessRate', 'Team Output / s'],
+            ['incomePerSecond', 'Revenue / s'],
             ['bureaucracyLevel', 'Office Level'],
-            ['queueCapacity', 'Inbox Limit'],
+            ['queueCapacity', 'Backlog Capacity'],
         ];
 
         statDefs.forEach(([key, label]) => {
@@ -374,7 +399,7 @@ export class MainScene extends Phaser.Scene {
     }
 
     createBottomSection() {
-        this.ui.bottomTitle = createLabel(this, 'Control Center', {
+        this.ui.bottomTitle = createLabel(this, 'Growth Hub', {
             fontFamily: THEME.typography.title,
             fontSize: '17px',
             color: THEME.colors.textPrimary,
@@ -388,7 +413,7 @@ export class MainScene extends Phaser.Scene {
             text: '#eefaf7',
         }, () => this.setActiveTab(TAB_UPGRADES));
 
-        this.ui.tabs.log = createButton(this, 'Log', {
+        this.ui.tabs.log = createButton(this, 'Feed', {
             fill: THEME.colors.cardNavy,
             pressed: 0x182534,
             disabled: THEME.colors.cardNavy,
@@ -506,6 +531,94 @@ export class MainScene extends Phaser.Scene {
         this.ui.root.add(this.ui.toast);
     }
 
+    createCompanyStagePreview() {
+        const container = this.add.container(0, 0);
+        const backdrop = makeStageRect(this, 0, 0, 86, 14, 0x162536, 1);
+        const floor = makeStageRect(this, 0, 11, 86, 3, 0x223447, 1);
+
+        const stages = [
+            createStageGroup(this, [
+                [8, 7, 16, 3, 0xa88d67],
+                [13, 4, 6, 3, 0x8ac2d0],
+                [26, 3, 2, 8, 0xd5b46c],
+                [33, 5, 6, 6, 0x4b6c56],
+            ]),
+            createStageGroup(this, [
+                [6, 7, 14, 3, 0xa88d67],
+                [10, 4, 5, 3, 0x8ac2d0],
+                [26, 7, 14, 3, 0xa88d67],
+                [30, 4, 5, 3, 0x8ac2d0],
+                [44, 5, 6, 6, 0x6d7586],
+                [54, 4, 8, 7, 0x4b6c56],
+            ]),
+            createStageGroup(this, [
+                [6, 7, 14, 3, 0xa88d67],
+                [10, 4, 5, 3, 0x8ac2d0],
+                [26, 7, 14, 3, 0xa88d67],
+                [30, 4, 5, 3, 0x8ac2d0],
+                [48, 2, 12, 8, 0xe5e2d2],
+                [64, 5, 8, 6, 0x4b6c56],
+            ]),
+            createStageGroup(this, [
+                [4, 7, 12, 3, 0xa88d67],
+                [8, 4, 4, 3, 0x8ac2d0],
+                [20, 7, 12, 3, 0xa88d67],
+                [24, 4, 4, 3, 0x8ac2d0],
+                [36, 7, 12, 3, 0xa88d67],
+                [40, 4, 4, 3, 0x8ac2d0],
+                [54, 6, 14, 4, 0xcbb08b],
+                [70, 4, 8, 7, 0x4b6c56],
+            ]),
+            createStageGroup(this, [
+                [4, 7, 10, 3, 0xa88d67],
+                [7, 4, 4, 3, 0x8ac2d0],
+                [17, 7, 10, 3, 0xa88d67],
+                [20, 4, 4, 3, 0x8ac2d0],
+                [30, 7, 10, 3, 0xa88d67],
+                [33, 4, 4, 3, 0x8ac2d0],
+                [43, 7, 10, 3, 0xa88d67],
+                [46, 4, 4, 3, 0x8ac2d0],
+                [57, 3, 10, 8, 0x2c4661],
+                [70, 5, 10, 6, 0x4b6c56],
+            ]),
+            createStageGroup(this, [
+                [3, 7, 8, 3, 0xa88d67],
+                [5, 4, 3, 3, 0x8ac2d0],
+                [14, 7, 8, 3, 0xa88d67],
+                [16, 4, 3, 3, 0x8ac2d0],
+                [25, 7, 8, 3, 0xa88d67],
+                [27, 4, 3, 3, 0x8ac2d0],
+                [36, 7, 8, 3, 0xa88d67],
+                [38, 4, 3, 3, 0x8ac2d0],
+                [47, 7, 8, 3, 0xa88d67],
+                [49, 4, 3, 3, 0x8ac2d0],
+                [58, 7, 8, 3, 0xa88d67],
+                [60, 4, 3, 3, 0x8ac2d0],
+                [69, 3, 13, 8, 0xd3b377],
+            ]),
+        ];
+
+        stages.forEach((stage, index) => {
+            stage.setVisible(index === 0);
+        });
+
+        container.currentStage = 1;
+        container.add([backdrop, floor, ...stages]);
+
+        return {
+            container,
+            setStage: (stageIndex) => {
+                if (stageIndex === container.currentStage) {
+                    return;
+                }
+                container.currentStage = stageIndex;
+                stages.forEach((stage, index) => {
+                    stage.setVisible(index === stageIndex - 1);
+                });
+            },
+        };
+    }
+
     registerInput() {
         this.input.on('wheel', (_pointer, _gameObjects, _deltaX, deltaY) => {
             if (this.activeTab !== TAB_UPGRADES || !this.maxPanelScroll) {
@@ -559,13 +672,17 @@ export class MainScene extends Phaser.Scene {
         this.layoutBackground(width, height);
 
         let y = LAYOUT.edge;
+        const rightColumnX = LAYOUT.edge + contentWidth - 96;
+        const leftColumnWidth = contentWidth - 118;
 
         this.ui.cards.header.setPosition(LAYOUT.edge, y).resize(contentWidth, LAYOUT.headerHeight);
-        this.ui.headerTitle.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 16).setWordWrapWidth(contentWidth - 140);
-        this.ui.headerHint.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 42).setWordWrapWidth(contentWidth - 140);
-        this.ui.headerProgress.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 58).setWordWrapWidth(contentWidth - 140);
-        this.ui.headerBudgetLabel.setPosition(LAYOUT.edge + contentWidth - 94, y + 16);
-        this.ui.headerBudgetValue.setPosition(LAYOUT.edge + contentWidth - 94, y + 32);
+        this.ui.headerTitle.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 16).setWordWrapWidth(leftColumnWidth);
+        this.ui.headerHint.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 42).setWordWrapWidth(leftColumnWidth);
+        this.ui.headerProgress.setPosition(LAYOUT.edge + LAYOUT.cardPadding, y + 58).setWordWrapWidth(leftColumnWidth);
+        this.ui.headerBudgetLabel.setPosition(rightColumnX, y + 12);
+        this.ui.headerBudgetValue.setPosition(rightColumnX, y + 24);
+        this.ui.headerStagePreview.container.setPosition(rightColumnX, y + 58);
+        this.ui.headerStageLabel.setPosition(rightColumnX + 43, y + 74);
         y += LAYOUT.headerHeight + LAYOUT.gap;
 
         this.ui.cards.stamp.setPosition(LAYOUT.edge, y).resize(contentWidth, LAYOUT.stampHeight);
@@ -759,28 +876,39 @@ export class MainScene extends Phaser.Scene {
         const nextTier = this.gameState.getNextTierMilestone();
         const contract = this.gameState.getCurrentContract();
         const contractProgress = contract ? this.gameState.getContractProgress(contract, stats) : 0;
+        const stageInfo = this.gameState.getCompanyStageInfo();
         const overflowText = stats.overflowActive
-            ? 'Inbox Full. New forms are being rejected.'
+            ? 'Backlog Full. New tasks are being dropped.'
             : '';
         const rushUnlocked = this.gameState.isTierUnlocked('department');
-        const rushLabel = state.rushMode ? 'Rush On' : 'Rush Off';
+        const rushLabel = state.rushMode ? 'Crunch On' : 'Crunch Off';
         const contractText = contract
-            ? `Contract: ${contract.label} (${formatNumber(Math.min(contractProgress, contract.target))} / ${formatNumber(contract.target)})`
-            : 'Contract: awaiting assignment';
+            ? `Milestone: ${contract.shortLabel} (${formatNumber(Math.min(contractProgress, contract.target))} / ${formatNumber(contract.target)})`
+            : 'Milestone: loading next target';
         const nextTierText = nextTier
             ? `Reward ${contract?.rewardLabel || '$0'} • Next: ${nextTier.label} ${formatNumber(nextTier.current)} / ${formatNumber(nextTier.target)} ${nextTier.suffix}`
             : `Reward ${contract?.rewardLabel || '$0'} • All tiers unlocked`;
 
         this.setCachedText('budget', this.ui.headerBudgetValue, `$${formatNumber(state.money)}`);
         this.setCachedText('headerHint', this.ui.headerHint, contractText);
-        this.setCachedText('headerProgress', this.ui.headerProgress, nextTierText);
-        this.setCachedText('pendingCount', this.ui.pendingCount, `Inbox: ${formatNumber(state.pendingForms)} / ${formatNumber(stats.queueCapacity)}`);
+        const displayTierText = nextTier
+            ? `Reward ${contract?.rewardLabel || '$0'} - Next ${nextTier.label} ${formatNumber(nextTier.current)} / ${formatNumber(nextTier.target)} ${nextTier.suffix}`
+            : `Reward ${contract?.rewardLabel || '$0'} - All tiers unlocked`;
+
+        this.setCachedText('headerProgress', this.ui.headerProgress, displayTierText);
+        this.setCachedText('pendingCount', this.ui.pendingCount, `Backlog: ${formatNumber(state.pendingForms)} / ${formatNumber(stats.queueCapacity)}`);
         this.setCachedText('overflowStatus', this.ui.overflowStatus, overflowText);
-        this.setCachedText('worthPerForm', this.ui.worthPerForm, `Process ${formatNumber(this.gameState.getStats().manualProcessAmount)} form${this.gameState.getStats().manualProcessAmount === 1 ? '' : 's'} to earn $${formatNumber(this.gameState.getMoneyPerProcessedForm())}`);
+        this.setCachedText(
+            'worthPerForm',
+            this.ui.worthPerForm,
+            `Ship ${formatNumber(stats.manualProcessAmount)} feature${stats.manualProcessAmount === 1 ? '' : 's'} for $${formatNumber(this.gameState.getMoneyPerProcessedForm())}`
+        );
         this.setCachedText('rushButtonLabel', this.ui.rushButton.label, rushLabel);
+        this.setCachedText('headerStageLabel', this.ui.headerStageLabel, stageInfo.label);
         this.ui.pendingCount.setColor(stats.overflowActive ? '#8a3f39' : '#52606d');
         this.ui.overflowStatus.setVisible(stats.overflowActive);
         this.ui.rushButton.setVisible(rushUnlocked);
+        this.ui.headerStagePreview.setStage(stageInfo.stage);
     }
 
     refreshStats() {
@@ -860,8 +988,8 @@ export class MainScene extends Phaser.Scene {
     }
 
     refreshStampButtonState() {
-        // STAMP FORM enable/disable is controlled exclusively by the current
-        // inbox count. Upgrade affordability and maxed states must never touch it.
+        // SHIP FEATURES enable/disable is controlled exclusively by the current
+        // backlog count. Upgrade affordability and maxed states must never touch it.
         const hasInboxForms = this.gameState.state.pendingForms > 0;
         this.ui.stampButton.setDisabled(!hasInboxForms);
     }
@@ -888,19 +1016,23 @@ export class MainScene extends Phaser.Scene {
     }
 
     shouldToast(message) {
-        return !!message && [
+        if (!message) {
+            return false;
+        }
+
+        const lower = message.toLowerCase();
+        return [
             'unlocked',
-            'approved by committee',
-            'Contract complete',
-            'New contract issued',
-            'Rush Mode',
-            'Budget surplus',
-            'Quarterly budget review',
-            'Office Level',
-            'Department tier',
-            'Agency tier',
-            'Automation audit',
-        ].some((keyword) => message.includes(keyword));
+            'milestone complete',
+            'new milestone',
+            'crunch mode',
+            'revenue passed',
+            'office level',
+            'department tier',
+            'agency tier',
+            'company stage',
+            'team output',
+        ].some((keyword) => lower.includes(keyword));
     }
 
     showToast(message) {

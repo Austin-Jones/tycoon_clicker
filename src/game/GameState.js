@@ -39,7 +39,7 @@ export class GameState {
                 overtimeProgram: 0,
                 federalSubsidy: 0,
             },
-            statusLog: ['Office opened. Initial backlog remains purely aspirational.'],
+            statusLog: ['Startup launched. The backlog starts with a few ambitious ideas.'],
             unlockFlags: {},
             overflowActive: false,
             rushMode: false,
@@ -80,7 +80,7 @@ export class GameState {
             if (!this.state.currentContract) {
                 this.assignNextContract();
             }
-            this.pushMessage('Archived files recovered from local storage.');
+            this.pushMessage('Startup data restored from local storage.');
             this.emitChange({
                 resources: true,
                 stats: true,
@@ -92,7 +92,7 @@ export class GameState {
             });
             return true;
         } catch (error) {
-            console.warn('Unable to load Bureaucracy Tycoon save.', error);
+            console.warn('Unable to load Startup Tycoon save.', error);
             return false;
         }
     }
@@ -104,7 +104,7 @@ export class GameState {
             // Saving only affects the timestamp, so the scene updates that label
             // on its own instead of doing a broader UI refresh here.
         } catch (error) {
-            console.warn('Unable to save Bureaucracy Tycoon progress.', error);
+            console.warn('Unable to save Startup Tycoon progress.', error);
         }
     }
 
@@ -113,7 +113,7 @@ export class GameState {
         this.surgeCooldown = 0;
         localStorage.removeItem(SAVE_KEY);
         this.assignNextContract();
-        this.pushMessage('All records shredded. Fresh paperwork incoming.');
+        this.pushMessage('Company rebooted. Back to the founder desk.');
         this.emitChange({
             resources: true,
             stats: true,
@@ -194,7 +194,7 @@ export class GameState {
                 label: 'Department',
                 current: this.state.processedFormsLifetime,
                 target: 30,
-                suffix: 'processed',
+                suffix: 'shipped',
             };
         }
 
@@ -204,11 +204,39 @@ export class GameState {
                 label: 'Agency',
                 current: this.state.money,
                 target: 220,
-                suffix: 'budget',
+                suffix: 'revenue',
             };
         }
 
         return null;
+    }
+
+    getCompanyStageInfo() {
+        const processed = this.state.processedFormsLifetime;
+        const money = this.state.money;
+        const officeLevel = this.state.bureaucracyLevel;
+
+        if (processed >= 520 || money >= 900 || officeLevel >= 5) {
+            return { stage: 6, label: 'HQ' };
+        }
+
+        if (processed >= 260 || money >= 420 || officeLevel >= 4) {
+            return { stage: 5, label: 'Scale-Up' };
+        }
+
+        if (processed >= 110 || money >= 180 || officeLevel >= 3) {
+            return { stage: 4, label: 'Startup Office' };
+        }
+
+        if (processed >= 40 || money >= 80 || officeLevel >= 2) {
+            return { stage: 3, label: 'Tiny Office' };
+        }
+
+        if (processed >= 12 || money >= 25) {
+            return { stage: 2, label: 'Apartment' };
+        }
+
+        return { stage: 1, label: 'Bedroom' };
     }
 
     getCurrentContract() {
@@ -320,15 +348,15 @@ export class GameState {
             changedResources = true;
             if (!this.state.overflowActive) {
                 this.state.overflowActive = true;
-                this.pushMessage(`Inbox overflow. ${formatRejected(rejected)} returned to sender.`);
+                this.pushMessage(`Backlog full. ${formatRejected(rejected)} dropped before the team could triage it.`);
                 changedLog = true;
             } else if (rejected >= 1 && Math.random() < 0.28) {
-                this.pushMessage(`${formatRejected(rejected)} rejected during backlog overflow.`);
+                this.pushMessage(`${formatRejected(rejected)} slipped out of the backlog during the rush.`);
                 changedLog = true;
             }
         } else if (this.state.overflowActive && next < stats.queueCapacity) {
             this.state.overflowActive = false;
-            this.pushMessage('Overflow pressure eased. New paperwork may once again enter the building.');
+            this.pushMessage('Backlog has room again. New tasks can flow back in.');
             changedLog = true;
         }
 
@@ -363,7 +391,7 @@ export class GameState {
 
         if (processable <= 0) {
             if (source === 'manual') {
-                this.pushMessage('No forms available. The queue has achieved stillness.');
+                this.pushMessage('No backlog to ship right now. The product board is briefly clear.');
                 changedLog = true;
                 if (!options.silent) {
                     this.emitChange({
@@ -390,7 +418,7 @@ export class GameState {
         this.state.money += payout;
 
         if (source === 'manual' && Math.random() < 0.2) {
-            this.pushMessage('Stamp applied with appropriate ceremonial delay.');
+            this.pushMessage('Feature shipped. The roadmap just moved forward.');
             changedLog = true;
         }
 
@@ -400,7 +428,7 @@ export class GameState {
         }
 
         if (source === 'surge') {
-            this.pushMessage('Surge Protocol clears a small emergency stack.');
+            this.pushMessage('Release Train cleared a burst of work from the backlog.');
             changedLog = true;
         }
 
@@ -427,7 +455,7 @@ export class GameState {
 
     buyUpgrade(id) {
         if (!this.isUpgradeUnlocked(id)) {
-            this.pushMessage('That policy has not been unlocked yet.');
+            this.pushMessage('That upgrade has not unlocked yet.');
             this.emitChange({
                 log: true,
             });
@@ -435,7 +463,7 @@ export class GameState {
         }
 
         if (this.isUpgradeMaxed(id)) {
-            this.pushMessage('That policy is already fully adopted.');
+            this.pushMessage('That upgrade is already maxed.');
             this.emitChange({
                 log: true,
             });
@@ -445,7 +473,7 @@ export class GameState {
         const cost = this.getUpgradeCost(id);
 
         if (!this.canAfford(cost)) {
-            this.pushMessage('Purchase request denied for budgetary clarity.');
+            this.pushMessage('Not enough revenue for that upgrade yet.');
             this.emitChange({
                 resources: false,
                 stats: false,
@@ -464,7 +492,7 @@ export class GameState {
             this.pushMessage(pickRandom(STATUS_MESSAGES.growth));
         } else {
             const upgrade = UPGRADE_DEFINITIONS[id];
-            this.pushMessage(`${upgrade.title} approved by committee.`);
+            this.pushMessage(`Unlocked ${upgrade.title}.`);
         }
 
         if (id === 'surgeProtocol') {
@@ -487,15 +515,15 @@ export class GameState {
 
     toggleRushMode() {
         if (!this.isTierUnlocked('department')) {
-            this.pushMessage('Rush directives unlock when the office expands into a department.');
+            this.pushMessage('Crunch Mode unlocks once the startup reaches the Department tier.');
             this.emitChange({ log: true });
             return false;
         }
 
         this.state.rushMode = !this.state.rushMode;
         this.pushMessage(this.state.rushMode
-            ? 'Rush Mode enabled. Budget rises faster, but the inbox will strain sooner.'
-            : 'Rush Mode disabled. Operations return to standard delay.');
+            ? 'Crunch Mode enabled. Revenue climbs faster, but the backlog will fill sooner.'
+            : 'Crunch Mode disabled. The team is back to a sustainable pace.');
         this.emitChange({
             resources: true,
             stats: true,
@@ -527,7 +555,7 @@ export class GameState {
         const progress = this.getContractProgress(contract, stats);
         if (progress >= contract.target) {
             this.state.money += contract.reward;
-            this.pushMessage(`Contract complete. ${contract.rewardLabel} awarded immediately.`);
+            this.pushMessage(`Milestone complete. ${contract.rewardLabel} in revenue landed instantly.`);
             this.assignNextContract();
             changedResources = true;
             changedContract = true;
@@ -552,7 +580,7 @@ export class GameState {
         const type = pickRandom(availableTypes);
         const contract = this.createContract(type, stats);
         this.state.currentContract = contract;
-        this.pushMessage(`New contract issued: ${contract.shortLabel}.`);
+        this.pushMessage(`New milestone: ${contract.shortLabel}.`);
         return contract;
     }
 
@@ -562,11 +590,11 @@ export class GameState {
             const reward = Math.max(20, Math.floor(target * ECONOMY.contractBudgetRewardMultiplier));
             return {
                 type,
-                shortLabel: `Earn $${target}`,
-                label: `Earn $${target} budget`,
+                shortLabel: `Reach $${target} revenue`,
+                label: `Reach $${target} revenue`,
                 target,
                 reward,
-                rewardLabel: `$${reward} budget`,
+                rewardLabel: `$${reward}`,
                 startValue: this.state.money,
             };
         }
@@ -576,11 +604,11 @@ export class GameState {
             const reward = 26 + (this.state.bureaucracyLevel * 8);
             return {
                 type,
-                shortLabel: `Avoid overflow for ${target}s`,
-                label: `Avoid overflow for ${target}s`,
+                shortLabel: `Keep backlog clear for ${target}s`,
+                label: `Keep backlog clear for ${target}s`,
                 target,
                 reward,
-                rewardLabel: `$${reward} budget`,
+                rewardLabel: `$${reward}`,
                 progress: 0,
             };
         }
@@ -590,11 +618,11 @@ export class GameState {
             const reward = 32 + (target * 10);
             return {
                 type,
-                shortLabel: `Reach ${target} auto / s`,
-                label: `Reach ${target} auto-process / s`,
+                shortLabel: `Reach ${target} team output / s`,
+                label: `Reach ${target} team output / s`,
                 target,
                 reward,
-                rewardLabel: `$${reward} budget`,
+                rewardLabel: `$${reward}`,
             };
         }
 
@@ -602,11 +630,11 @@ export class GameState {
         const reward = Math.max(16, Math.floor(target * ECONOMY.contractBudgetRewardMultiplier));
         return {
             type: 'process',
-            shortLabel: `Process ${target} forms`,
-            label: `Process ${target} forms`,
+            shortLabel: `Ship ${target} features`,
+            label: `Ship ${target} features`,
             target,
             reward,
-            rewardLabel: `$${reward} budget`,
+            rewardLabel: `$${reward}`,
             startValue: this.state.processedFormsLifetime,
         };
     }
@@ -634,12 +662,12 @@ export class GameState {
         unlocked = this.unlockOnce(
             'tier-department',
             this.state.processedFormsLifetime >= 30,
-            'Department tier unlocked. New policies approved, including Rush Mode.'
+            'Department tier unlocked. Crunch Mode and sharper team upgrades are now live.'
         ) || unlocked;
         unlocked = this.unlockOnce(
             'tier-agency',
             this.state.money >= 220,
-            'Agency tier unlocked. High-level directives and advanced upgrades are now available.'
+            'Agency tier unlocked. Big systems, monetization, and scale upgrades are now available.'
         ) || unlocked;
 
         return unlocked;
@@ -674,13 +702,18 @@ export class GameState {
         const processed = this.state.processedFormsLifetime;
         const money = this.state.money;
 
-        unlocked = this.unlockOnce('forms-10', processed >= 10, 'Ten forms processed. The office now recognizes momentum.') || unlocked;
-        unlocked = this.unlockOnce('forms-50', processed >= 50, 'Fifty forms processed. Throughput now qualifies as a management concern.') || unlocked;
-        unlocked = this.unlockOnce('money-100', money >= 100, 'Budget surplus detected. Additional clipboards authorized.') || unlocked;
-        unlocked = this.unlockOnce('money-250', money >= 250, 'Quarterly budget review passed. Procurement has become optimistic.') || unlocked;
+        unlocked = this.unlockOnce('forms-10', processed >= 10, 'Ten features shipped. The product is finally building momentum.') || unlocked;
+        unlocked = this.unlockOnce('forms-50', processed >= 50, 'Fifty features shipped. This is starting to look like a real startup.') || unlocked;
+        unlocked = this.unlockOnce('money-100', money >= 100, 'Revenue passed $100. The team can spend with more confidence now.') || unlocked;
+        unlocked = this.unlockOnce('money-250', money >= 250, 'Revenue passed $250. Bigger bets are now on the table.') || unlocked;
         unlocked = this.unlockOnce('bureaucracy-3', this.state.bureaucracyLevel >= 3, pickRandom(STATUS_MESSAGES.unlocked)) || unlocked;
-        unlocked = this.unlockOnce('bureaucracy-4', this.state.bureaucracyLevel >= 4, 'Office Level 4 reached. Departmental momentum has become official.') || unlocked;
-        unlocked = this.unlockOnce('auto-5', this.getStats().autoProcessRate >= 5, 'Automation audit passed with minimal enthusiasm.') || unlocked;
+        unlocked = this.unlockOnce('bureaucracy-4', this.state.bureaucracyLevel >= 4, 'Office Level 4 reached. The company is moving with real startup energy.') || unlocked;
+        unlocked = this.unlockOnce('auto-5', this.getStats().autoProcessRate >= 5, 'Team output passed 5 per second. Shipping is starting to compound.') || unlocked;
+        unlocked = this.unlockOnce('company-stage-2', this.getCompanyStageInfo().stage >= 2, 'Company Stage: Apartment. The bedroom hustle is spilling into shared space.') || unlocked;
+        unlocked = this.unlockOnce('company-stage-3', this.getCompanyStageInfo().stage >= 3, 'Company Stage: Tiny Office. The startup finally has a whiteboard and an address.') || unlocked;
+        unlocked = this.unlockOnce('company-stage-4', this.getCompanyStageInfo().stage >= 4, 'Company Stage: Startup Office. The team is starting to look real.') || unlocked;
+        unlocked = this.unlockOnce('company-stage-5', this.getCompanyStageInfo().stage >= 5, 'Company Stage: Scale-Up. The workspace finally feels like a company.') || unlocked;
+        unlocked = this.unlockOnce('company-stage-6', this.getCompanyStageInfo().stage >= 6, 'Company Stage: HQ. This little startup has gone big-league.') || unlocked;
         return unlocked;
     }
 
@@ -708,5 +741,5 @@ export class GameState {
 }
 
 function formatRejected(amount) {
-    return `${amount} form${amount === 1 ? '' : 's'}`;
+    return `${amount} task${amount === 1 ? '' : 's'}`;
 }

@@ -2,8 +2,8 @@ import { MainScene } from './scenes/MainScene.js';
 
 const config = {
     type: Phaser.AUTO,
-    title: 'Bureaucracy Tycoon',
-    description: 'An idle game about profitable inefficiency.',
+    title: 'Startup Tycoon',
+    description: 'An idle game about building a scrappy startup into a major tech company.',
     parent: 'game-container',
     width: 390,
     height: 844,
